@@ -1,0 +1,166 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B5.1</title>
+<style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#373344;background:#f5f2f6}body{max-width:1000px;margin:20px auto;padding:0 14px}header,main{background:#fff;border-radius:17px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px #2520300a}h1{font-size:24px;margin:0 0 10px}h2{font-size:18px}.notice{background:#f2eaf4;padding:13px;border-radius:10px;line-height:1.65}button{border:0;border-radius:9px;background:#77648e;color:white;padding:10px 13px;cursor:pointer}button:disabled{opacity:.4}.secondary{background:#ece5f1;color:#59446b}.danger{background:#f9e8e8;color:#934c4c}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.foodrow{display:grid;grid-template-columns:1.1fr .7fr 1.4fr auto auto;gap:8px;padding:13px 0;border-bottom:1px solid #eee}input,select{box-sizing:border-box;width:100%;padding:9px;border:1px solid #d6ccd9;border-radius:8px;min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f6f8;padding:12px;max-height:320px;overflow:auto}.muted{color:#6d6774;font-size:14px}.status{min-height:1.5em;color:#765b7b}.stats{display:flex;gap:28px;flex-wrap:wrap}label{display:block;margin:7px 0}small{color:#706b76}@media(max-width:700px){.foodrow{grid-template-columns:1fr 1fr}.foodrow select{grid-column:1/-1}header,main{padding:15px}}</style></head><body>
+<header><h1>HanHan Care｜營養資料庫整合草稿 B5.1</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；不會由本頁程式儲存或上傳食物資料。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版沿用 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
+<main><h2>① 選擇食物資料來源</h2><p class="muted">可先載入 10 項<b>虛構測試資料</b>測試流程；或選擇符合 V1.9.0 格式的食藥署 CSV。不要上傳包含個人紀錄的 JSON 備份。</p><div class="actions"><button id="fixture" class="secondary">載入虛構食物資料</button><input id="csv" type="file" accept=".csv,text/csv" aria-label="選擇官方食物 CSV"></div><p id="dbStatus" class="status" role="status">尚未載入資料庫</p></main>
+<main><h2>② 自訂份量換算（本次新增）</h2><p class="muted">可選擇儲存在此瀏覽器；清除網站資料會遺失，請定期匯出設定備份。預設雞蛋 1 顆＝50g 僅供測試，其他份量須自行設定；不會默默猜測半碗或一片的重量。</p><div class="actions"><input id="portionFood" placeholder="食物名稱，例如白飯" aria-label="份量食物名稱" style="max-width:210px"><select id="portionUnit" aria-label="份量單位" style="max-width:130px"><option>碗</option><option>顆</option><option>個</option><option>片</option><option>塊</option><option>湯匙</option><option>茶匙</option><option>份</option><option>口</option><option>mL</option></select><input id="portionGrams" type="number" min="0.1" step="0.1" placeholder="每單位幾公克" aria-label="每單位公克" style="max-width:165px"><button id="savePortion" class="secondary">新增換算</button></div><p id="portionStatus" class="status" role="status"></p><div id="portionList" class="muted"></div></main>
+<main><h2>③ 設定保存、匯出與還原（B5.1 修正）</h2>
+<p class="muted">僅儲存「自訂份量」與「食材名稱對應」，不保存餐點、照片、營養資料庫或健康資料。GitHub Pages 是公開測試站，請只使用虛構測試設定。Android 平板可下載 JSON 備份，換裝置時再匯入。</p>
+<label><input id="persistEnabled" type="checkbox" style="width:auto"> 同意將測試設定保存在本裝置瀏覽器（localStorage）</label>
+<div class="actions"><button id="exportSettings" class="secondary">下載設定 JSON 備份</button><label style="display:inline-flex;align-items:center;gap:8px"><span>還原設定 JSON</span><input id="importSettings" type="file" accept=".json,application/json" style="max-width:240px"></label><button id="clearSettings" class="danger">清除本頁設定</button></div>
+<p id="settingsStatus" class="status" role="status">未啟用瀏覽器保存</p></main>
+<main><h2>④ 食材輸入與確認</h2><p class="muted">最多 50 項；重量可填 100g、半碗、2顆等。官方品項需要逐項選擇，不會自行猜測雞胸肉品種。</p><p id="count"></p><div id="rows"></div><div class="actions"><button id="add">＋ 增加食材</button><button id="mock" class="secondary">載入虛構辨識示範</button><button id="calculate" disabled>確認全部並計算</button></div><p id="status" class="status" role="status"></p></main>
+<main><h2>⑤ 整餐營養結果</h2><div class="stats"><p>熱量 <b id="cal">—</b> kcal</p><p>蛋白質 <b id="pro">—</b> g</p></div><p id="coverage">尚未計算</p><details><summary>展開 24 項營養素與完整性</summary><div id="nutrients"></div></details><details><summary>查看餐點 JSON 草稿（不會上傳）</summary><pre id="output">尚未產生</pre></details></main>
+<script>
+'use strict';
+const fields=["cal", "pro", "carb", "fat", "fiber", "vitA", "b1", "b2", "b6", "folate", "vitC", "vitE", "calcium", "phosphorus", "magnesium", "potassium", "sodium", "iron", "zinc", "selenium", "copper", "manganese", "germanium", "cobalt"];
+const $=id=>document.getElementById(id);
+let database=[],rows=[],nextId=1,dbKind='none';const portionSettings=new Map(),confirmedMappings=new Map();
+function csvParse(t){let rows=[],r=[],v='',quoted=false;for(let i=0;i<t.length;i++){let c=t[i];if(quoted){if(c==='"'&&t[i+1]==='"'){v+='"';i++}else if(c==='"')quoted=false;else v+=c}else if(c==='"')quoted=true;else if(c===','){r.push(v);v=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;r.push(v);v='';if(r.some(x=>x.trim()))rows.push(r);r=[]}else v+=c}r.push(v);if(r.some(x=>x.trim()))rows.push(r);return rows}
+function numericNutrient(v){let t=String(v??'').trim().replace(/,/g,'');if(!t||/^(?:-|—|－|tr|trace|未檢出|微量|nd|n\.d\.)$/i.test(t))return null;let n=Number(t);return Number.isFinite(n)&&n>=0?n:null}
+function nutrientKey(n){let x=String(n).replace(/\s/g,'').toLowerCase();
+if(/維生素a|視網醇當量|維生素ａ/.test(x))return 'vitA';
+if(/維生素b1|硫胺素|thiamin/.test(x))return 'b1';
+if(/維生素b2|核黃素|riboflavin/.test(x))return 'b2';
+if(/維生素b6|吡哆醇|pyridoxine/.test(x))return 'b6';
+if(/葉酸|folate/.test(x))return 'folate';
+if(/維生素c|抗壞血酸|ascorbic/.test(x))return 'vitC';
+if(/維生素e|α-生育醇當量|alpha-tocopherol/.test(x))return 'vitE';
+if(/^鈣|^calcium/.test(x))return 'calcium';if(/^磷|^phosphorus/.test(x))return 'phosphorus';
+if(/^鎂|^magnesium/.test(x))return 'magnesium';if(/^鉀|^potassium/.test(x))return 'potassium';
+if(/^鈉|^sodium/.test(x))return 'sodium';if(/^鐵|^iron/.test(x))return 'iron';
+if(/^鋅|^zinc/.test(x))return 'zinc';if(/^硒|^selenium/.test(x))return 'selenium';
+if(/^銅|^copper/.test(x))return 'copper';if(/^錳|^manganese/.test(x))return 'manganese';
+if(/^鍺|^germanium/.test(x))return 'germanium';if(/^鈷|^cobalt/.test(x))return 'cobalt';
+if(/修正熱量|^熱量/.test(x))return'cal';
+if(/粗蛋白|^蛋白質/.test(x))return'pro';
+if(/總碳水化合物|^碳水化合物/.test(x))return'carb';
+if(/粗脂肪|^脂肪/.test(x)&&!/脂肪酸/.test(x))return'fat';
+if(/膳食纖維/.test(x))return'fiber';return null}
+const nutrientInfo={cal:['熱量','kcal'],pro:['蛋白質','g'],carb:['碳水化合物','g'],fat:['脂肪','g'],fiber:['膳食纖維','g'],vitA:['維生素A','μg RE'],b1:['維生素B1','mg'],b2:['維生素B2','mg'],b6:['維生素B6','mg'],folate:['葉酸','μg'],vitC:['維生素C','mg'],vitE:['維生素E','mg'],calcium:['鈣','mg'],phosphorus:['磷','mg'],magnesium:['鎂','mg'],potassium:['鉀','mg'],sodium:['鈉','mg'],iron:['鐵','mg'],zinc:['鋅','mg'],selenium:['硒','μg'],copper:['銅','mg'],manganese:['錳','mg'],germanium:['鍺','μg'],cobalt:['鈷','μg']};
+function normalizeNutrient(v,unit,key){if(v===null)return null;let u=String(unit||'').trim().toLowerCase().replace(/μ/g,'µ').replace(/微公克|微克/g,'µg').replace(/毫克/g,'mg').replace(/公克/g,'g');let target=nutrientInfo[key][1].toLowerCase().replace(/μ/g,'µ');if(!u)return null;if(key==='cal')return /kcal|大卡|千卡/.test(u)?v:null;
+if(target==='g'){if(u==='g')return v;if(u==='mg')return v/1000;if(u==='µg'||u==='ug')return v/1e6;return null}
+if(target==='mg'){if(u==='mg')return v;if(u==='g')return v*1000;if(u==='µg'||u==='ug')return v/1000;return null}
+if(target==='µg'||target==='µg re'){if(u==='µg'||u==='ug'||u==='µg re'||u==='µgre')return v;if(u==='mg')return v*1000;return null}
+return null}
+function importOfficialRows(rows){if(!rows.length)throw Error('空白 CSV');
+let head=rows[0].map(x=>x.replace(/^\ufeff/,'').trim()),ix=k=>head.indexOf(k);
+if(['樣品名稱','分析項','每100克含量'].some(k=>ix(k)<0))throw Error('欄位不符：需要樣品名稱、分析項、每100克含量');
+if(ix('含量單位')<0)throw Error('缺少含量單位，無法安全換算維生素及礦物質');
+let groups=new Map(),matched={};
+for(let r of rows.slice(1)){let name=(r[ix('樣品名稱')]||'').trim(),item=r[ix('分析項')]||'',key=nutrientKey(item),unit=r[ix('含量單位')]||'';if(!name)continue;
+let id=(ix('整合編號')>=0?r[ix('整合編號')]:'')||name;
+let g=groups.get(id);if(!g){g={name,aliases:[],values:Object.fromEntries(fields.map(k=>[k,null])),source:'食藥署匯入CSV'};groups.set(id,g)}
+if(ix('俗名')>=0){let a=(r[ix('俗名')]||'').split(/[、,，;；\/]/).map(x=>x.trim()).filter(Boolean);g.aliases=[...new Set([...g.aliases,...a])]}
+if(key){let raw=numericNutrient(r[ix('每100克含量')]),val=normalizeNutrient(raw,unit,key);if(val!==null&&g.values[key]===null){g.values[key]=val;matched[key]=(matched[key]||0)+1}}}
+let result=[...groups.values()].filter(x=>Object.values(x.values).some(v=>v!==null));if(result.length<10)throw Error('解析有效食物少於10筆');if(!matched.cal||!matched.pro)throw Error('缺少有效熱量或蛋白質欄位，請檢查 CSV 單位與格式');window.lastImportCounts=matched;return result}
+
+function normFood(s){return String(s||'').replace(/[\s（）()\-]/g,'').toLowerCase()}
+const aliases={'高麗菜':['甘藍','結球甘藍'],'地瓜':['甘藷','番薯'],'台灣鯛':['吳郭魚','鯛魚'],'番茄':['蕃茄']};
+function candidates(name){const q=normFood(name), keys=[q,...(aliases[name]||[]).map(normFood)];if(!q)return [];
+ const exact=database.filter(f=>keys.some(k=>k&&(normFood(f.name)===k||(f.aliases||[]).some(a=>normFood(a)===k))));
+ const fuzzy=database.filter(f=>!exact.includes(f)&&keys.some(k=>k.length>1&&(normFood(f.name).includes(k)||(f.aliases||[]).some(a=>normFood(a).includes(k)))));
+ const chicken=/雞胸|胸肉/.test(q)?database.filter(f=>/雞/.test(f.name)&&/胸|里肌/.test(f.name)):[];
+ return [...new Set([...exact,...chicken,...fuzzy])].slice(0,24);
+}
+
+// Session-only conversion; intentionally no localStorage, cookies or network.
+function parseQuantity(text){let t=String(text).trim().replace(/\s+/g,'');if(t.startsWith('半'))return {qty:0.5,rest:t.slice(1)};let m=t.match(/^(\d+(?:\.\d+)?)(?:\/(\d+(?:\.\d+)?))?/);if(!m)return null;let qty=Number(m[1]);if(m[2])qty/=Number(m[2]);return Number.isFinite(qty)&&qty>0?{qty,rest:t.slice(m[0].length)}:null}
+function weightConversion(name,amount){let p=parseQuantity(amount);if(!p)return {error:'份量需包含有效數字或「半」'};let unit=p.rest;if(!unit)return {error:'請加上單位，例如100g、半碗、2顆'};if(/^(g|公克|克)$/i.test(unit))return {grams:p.qty,note:'秤重'};if(/^(kg|公斤)$/i.test(unit))return {grams:p.qty*1000,note:'秤重'};if(!/^(mL|毫升|碗|顆|個|片|塊|湯匙|茶匙|份|口)$/i.test(unit))return {error:'不支援的份量單位：'+unit};let normalized=/^(ml|毫升)$/i.test(unit)?'mL':unit;let key=normFood(name)+'|'+normalized;let w=portionSettings.get(key);if(w==null&&/顆|個/.test(normalized)&&/雞蛋/.test(name))w=50;if(w==null)return {error:'請先設定「'+name+'」每1'+normalized+'幾公克'};return {grams:p.qty*w,note:'每1'+normalized+'＝'+w+'g（自訂／雞蛋預設）'}}
+function renderPortions(){let box=$('portionList');box.replaceChildren();for(let [key,w] of portionSettings){let p=document.createElement('p');p.textContent=key+'：'+w+'g　';let b=document.createElement('button');b.textContent='刪除';b.className='danger';b.addEventListener('click',()=>{portionSettings.delete(key);persistSettings();invalidateAll();renderPortions()});p.append(b);box.append(p)}}
+function invalidateAll(){for(const r of rows)r.confirmed=false;render();$('cal').textContent='—';$('pro').textContent='—';$('coverage').textContent='設定已修改，請重新確認並計算';$('output').textContent='尚未產生'}
+$('savePortion').addEventListener('click',()=>{let name=$('portionFood').value.trim(),unit=$('portionUnit').value,grams=Number($('portionGrams').value);if(!name||!Number.isFinite(grams)||grams<=0||grams>10000){$('portionStatus').textContent='請填食物名稱與有效公克數';return}portionSettings.set(normFood(name)+'|'+unit,grams);persistSettings();$('portionStatus').textContent='已設定：'+name+' 每1'+unit+'＝'+grams+'g（本頁暫存）';renderPortions();invalidateAll()});
+
+function setStatus(s){$('status').textContent=s}
+function addRow(name='',grams='100g'){if(rows.length>=50){setStatus('最多 50 項食材');return}rows.push({id:nextId++,name,amount:String(grams),foodIndex:-1,confirmed:false});invalidateAll()}
+function invalidate(row){row.confirmed=false;$('cal').textContent='—';$('pro').textContent='—';$('coverage').textContent='資料已修改，請重新確認並計算';$('nutrients').replaceChildren();$('output').textContent='尚未產生';updateButtons()}
+function render(){const root=$('rows');root.replaceChildren();for(const row of rows){const el=document.createElement('section');el.className='foodrow';
+ const name=document.createElement('input');name.placeholder='食材名稱';name.value=row.name;name.setAttribute('aria-label','食材名稱');name.addEventListener('input',()=>{row.name=name.value;row.foodIndex=-1;invalidate(row);refreshSelect()});
+ const weight=document.createElement('input');weight.type='text';weight.value=row.amount;weight.placeholder='100g、半碗、2顆';weight.setAttribute('aria-label','食材份量');weight.addEventListener('input',()=>{row.amount=weight.value;invalidate(row)});
+ const select=document.createElement('select');select.setAttribute('aria-label','對應食物資料');
+ function refreshSelect(){select.replaceChildren();const blank=document.createElement('option');blank.value='-1';blank.textContent=database.length?'請選擇對應品項':'請先載入資料庫';select.append(blank);for(const f of candidates(row.name)){const i=database.indexOf(f),opt=document.createElement('option');opt.value=String(i);opt.textContent=f.name;select.append(opt)}select.value=String(row.foodIndex);if(select.selectedIndex<0)select.value='-1';if(row.foodIndex===-1){let preferred=confirmedMappings.get(normFood(row.name));if(preferred!=null&&select.querySelector('option[value=\"'+preferred+'\"]')){row.foodIndex=preferred;select.value=String(preferred)}}}refreshSelect();
+ select.addEventListener('change',()=>{row.foodIndex=Number(select.value);invalidate(row)});
+ const confirm=document.createElement('button');confirm.className='secondary';confirm.textContent=row.confirmed?'✓ 已確認':'確認此項';confirm.addEventListener('click',()=>{const c=weightConversion(row.name,row.amount);if(!row.name.trim()||c.error||!(c.grams>0)||c.grams>10000||!database[row.foodIndex]){setStatus(c.error||'請先填寫食材、有效重量並選擇資料庫品項');return}row.confirmed=true;if(!/雞胸|胸肉/.test(normFood(row.name)))confirmedMappings.set(normFood(row.name),database[row.foodIndex].name);persistSettings();render();setStatus('已確認一項食材')});
+ const remove=document.createElement('button');remove.className='danger';remove.textContent='移除';remove.addEventListener('click',()=>{rows=rows.filter(x=>x.id!==row.id);invalidateAll()});
+ el.append(name,weight,select,confirm,remove);root.append(el)}updateButtons()}
+function updateButtons(){const ready=rows.length>0&&rows.every(r=>r.confirmed&&r.name.trim()&&!weightConversion(r.name,r.amount).error&&weightConversion(r.name,r.amount).grams<=10000&&database[r.foodIndex]);$('calculate').disabled=!ready;$('count').textContent=`${rows.length}/50 項食材，${rows.filter(r=>r.confirmed).length} 項已確認`}
+function calculateMeal(){if(rows.length<1||rows.length>50||!rows.every(r=>r.confirmed&&database[r.foodIndex]))throw Error('請先確認全部食材');
+ const sums=Object.fromEntries(fields.map(k=>[k,0])),coverage=Object.fromEntries(fields.map(k=>[k,0]));const items=[];
+ for(const r of rows){const f=database[r.foodIndex],vals={},c=weightConversion(r.name,r.amount);if(c.error||!(c.grams>0)||c.grams>10000)throw Error(c.error||'份量無效');for(const k of fields){const v=f.values[k];if(v==null){vals[k]=null;continue}if(typeof v!=='number'||!Number.isFinite(v)||v<0)throw Error('資料庫數值錯誤：'+k);vals[k]=v*c.grams/100;sums[k]+=vals[k];coverage[k]++}items.push({name:r.name,amount:r.amount,grams:c.grams,estimated:true,matched:f.name,source:f.source,vals})}
+ const nutrition=Object.fromEntries(fields.map(k=>[k,coverage[k]===0?null:sums[k]]));const incomplete=fields.some(k=>coverage[k]<rows.length);
+ return {items,nutrition,nutritionCoverage:fields.map(k=>coverage[k]),incomplete};}
+function showResult(r){const fmt=v=>v===null?'未知':(Math.round(v*100)/100).toString();$('cal').textContent=fmt(r.nutrition.cal);$('pro').textContent=fmt(r.nutrition.pro);$('coverage').textContent=r.incomplete?'部分營養素缺資料，整餐營養不完整':'全部營養素皆有資料';
+ const box=$('nutrients');box.replaceChildren();for(const k of fields){const p=document.createElement('p');p.textContent=k+'：'+fmt(r.nutrition[k])+'（'+r.nutritionCoverage[fields.indexOf(k)]+'/'+r.items.length+' 項有資料）';box.append(p)}
+ $('output').textContent=JSON.stringify({schemaVersion:'1.0.0-draft',items:r.items,nutrition:r.nutrition,nutritionCoverage:r.nutritionCoverage,incomplete:r.incomplete,recognition:{source:'manual-or-demo',userConfirmed:true,imageStored:false},deletedAt:null},null,2)}
+function loadDatabase(d,kind){database=d;dbKind=kind;for(const r of rows){r.foodIndex=-1;r.confirmed=false}invalidateAll();$('dbStatus').textContent=`已載入 ${d.length} 項${kind==='fictional'?'虛構測試':'CSV 匯入'}食物；資料庫只在本頁記憶體中，沒有上傳。`;}
+$('fixture').addEventListener('click',()=>{const names=['白飯','雞蛋','青菜','高麗菜','雞胸肉（肉雞）','雞胸肉（土雞）','豆腐','比目魚','冬瓜','牛腱'];loadDatabase(names.map((name,i)=>({name,aliases:[],source:'虛構測試資料／非食藥署',values:Object.fromEntries(fields.map(k=>[k,k==='cal'?100+i*10:k==='pro'?3+i:k==='carb'?5+i:null]))})),'fictional')});
+$('csv').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;if(!/\.csv$/i.test(f.name)||f.size>25*1024*1024){$('dbStatus').textContent='請選擇 25MB 以下的 .csv 食物資料檔';return}try{const d=importOfficialRows(csvParse(await f.text()));loadDatabase(d,'official');}catch(err){$('dbStatus').textContent='CSV 匯入失敗：'+err.message}});
+$('add').addEventListener('click',()=>addRow());$('mock').addEventListener('click',()=>{rows=[];addRow('白飯','100g');addRow('雞蛋','1顆');addRow('青菜','30g');setStatus('已載入虛構辨識示範；請選擇品項、確認重量。這不是 Gemini 真正辨識。')});
+$('calculate').addEventListener('click',()=>{try{showResult(calculateMeal());setStatus('本地計算完成；未儲存、未上傳。')}catch(e){setStatus('計算失敗：'+e.message)}});
+
+const SETTINGS_KEY='hanhan-care-demo-b5-settings-v1';
+function snapshotSettings(){return {format:'hanhan-demo-settings-v1',portions:[...portionSettings.entries()],mappings:[...confirmedMappings.entries()]}}
+function validateSettings(v){
+ if(!v||v.format!=='hanhan-demo-settings-v1'||!Array.isArray(v.portions)||!Array.isArray(v.mappings)||
+    v.portions.length>500||v.mappings.length>500)throw Error('設定檔格式或筆數不正確');
+ for(const [key,weight] of v.portions){if(typeof key!=='string'||key.length>120||!key.includes('|')||
+   typeof weight!=='number'||!Number.isFinite(weight)||weight<=0||weight>10000)throw Error('份量設定不正確')}
+ for(const [key,name] of v.mappings){if(typeof key!=='string'||!key||key.length>120||
+   typeof name!=='string'||!name||name.length>150)throw Error('食材對應不正確')}
+ return v;
+}
+function applySettings(v){validateSettings(v);portionSettings.clear();confirmedMappings.clear();
+ for(const [k,w] of v.portions)portionSettings.set(k,w);
+ for(const [k,n] of v.mappings)confirmedMappings.set(k,n);
+ renderPortions();invalidateAll();
+}
+function persistSettings(){
+ if(!$('persistEnabled').checked)return;
+ try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(snapshotSettings()));
+ $('settingsStatus').textContent='測試設定已儲存於本裝置瀏覽器；不是雲端備份。'}
+ catch(e){$('settingsStatus').textContent='瀏覽器儲存失敗，請使用 JSON 匯出備份。'}
+}
+$('persistEnabled').addEventListener('change',()=>{
+ if($('persistEnabled').checked)persistSettings();
+ else {try{localStorage.removeItem(SETTINGS_KEY)}catch(e){}
+ $('settingsStatus').textContent='已停用瀏覽器保存並清除本頁保存的設定。'}
+});
+$('exportSettings').addEventListener('click',()=>{
+ const blob=new Blob([JSON.stringify(snapshotSettings(),null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;
+ a.download='hanhan-demo-settings-b5.json';document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+ $('settingsStatus').textContent='已觸發 JSON 下載；請確認平板「下載」資料夾。'
+});
+$('importSettings').addEventListener('change',async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ if(!/\.json$/i.test(file.name)||file.size>200000){$('settingsStatus').textContent='請選擇 200KB 以下的設定 JSON';return}
+ try{const obj=validateSettings(JSON.parse(await file.text()));
+ // A restore must explicitly re-enable persistence: clearSettings() turns it off.
+ const serialized=JSON.stringify(obj);
+ try{
+   localStorage.setItem(SETTINGS_KEY,serialized);
+   if(localStorage.getItem(SETTINGS_KEY)!==serialized)throw Error('寫入驗證失敗');
+ }catch(storageError){
+   $('settingsStatus').textContent='還原檔案有效，但無法保存到瀏覽器：'+storageError.message+'。請保留 JSON 備份。';
+   return;
+ }
+ applySettings(obj);
+ $('persistEnabled').checked=true;
+ $('settingsStatus').textContent='設定已還原並保存：'+obj.portions.length+' 個份量、'+obj.mappings.length+' 個對應。重新整理後應仍保留。';}
+ catch(err){$('settingsStatus').textContent='還原失敗：'+err.message}
+ e.target.value='';
+});
+$('clearSettings').addEventListener('click',()=>{
+ if(!confirm('清除本頁的自訂份量與食材對應設定？'))return;
+ portionSettings.clear();confirmedMappings.clear();
+ try{localStorage.removeItem(SETTINGS_KEY)}catch(e){}
+ $('persistEnabled').checked=false;renderPortions();invalidateAll();
+ $('settingsStatus').textContent='已清除本頁測試設定。';
+});
+try{const raw=localStorage.getItem(SETTINGS_KEY);if(raw){
+ applySettings(JSON.parse(raw));$('persistEnabled').checked=true;
+ $('settingsStatus').textContent='已從本裝置瀏覽器載入測試設定。'
+}}catch(e){$('settingsStatus').textContent='既有設定無法讀取；請使用 JSON 備份還原。'}
+
+addRow();
+</script></body></html>
