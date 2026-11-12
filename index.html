@@ -1,0 +1,117 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>HanHan Care｜本地草稿測試</title>
+<style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#333344;background:#f5f2f6}body{max-width:920px;margin:25px auto;padding:0 15px}header,main{background:white;border-radius:16px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px #2520300a}h1{font-size:24px;margin:0 0 8px}h2{font-size:18px}.notice{background:#f3e9f4;padding:12px;border-radius:10px}button{border:0;border-radius:8px;background:#77648e;color:white;padding:10px 13px;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#ede6f2;color:#58476b}.danger{background:#f9e8e8;color:#934c4c}.foodrow{display:grid;grid-template-columns:1.3fr .7fr 1.4fr auto auto;gap:7px;padding:12px 0;border-bottom:1px solid #eee}input,select{box-sizing:border-box;width:100%;padding:9px;border:1px solid #d6ccd9;border-radius:8px;min-width:0}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f6f8;padding:14px;border-radius:10px;max-height:330px;overflow:auto}#status{color:#745478;min-height:1.5em}.totals{display:flex;gap:30px;flex-wrap:wrap}small{color:#666}@media(max-width:680px){.foodrow{grid-template-columns:1fr 1fr}.foodrow select{grid-column:1/-1}}</style></head><body>
+<header><h1>HanHan Care｜餐點整合草稿</h1><p class="notice"><strong>平板單檔離線示範。</strong>所有食物數據及 AI 辨識結果均為虛構測試資料，非食藥署資料、非 Gemini 真正辨識；不儲存、不連網傳送健康資料。</p><small>不需要 Python 或網頁伺服器。與正式 V1.9.0 完全分離，不覆蓋原始程式。</small></header>
+<main><h2>食材輸入與人工確認</h2><p id="count"></p><div id="rows"></div><div class="actions"><button id="add">＋ 增加食材</button><button id="mock" class="secondary">載入虛構 AI 辨識示範</button><button id="calculate" disabled>確認全部並計算</button></div><p id="status" role="status"></p></main>
+<main><h2>整餐營養結果（示範）</h2><div class="totals"><p>熱量 <strong id="cal">—</strong> kcal</p><p>蛋白質 <strong id="pro">—</strong> g</p></div><p id="coverage">尚未計算</p><details><summary>查看新版餐點 JSON 草稿</summary><pre id="output">尚未產生</pre></details></main>
+<script>
+// meal-adapter.mjs
+// DRAFT ONLY: no network, persistence or cloud operations.
+const FIELDS = Object.freeze(["cal", "pro", "carb", "fat", "fiber", "vitA", "b1", "b2", "b6", "folate", "vitC", "vitE", "calcium", "phosphorus", "magnesium", "potassium", "sodium", "iron", "zinc", "selenium", "copper", "manganese", "germanium", "cobalt"]);
+const legacyObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+const dateOK = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s+'T00:00:00Z')) && new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
+function numeric(v,key){if(v===null||v===undefined||v==='')return null;if(typeof v!=='number'||!Number.isFinite(v)||v<0)throw new TypeError('Invalid '+key);return v;}
+function adaptLegacyMeal(m){
+ if(!legacyObject(m)||!dateOK(m.date)||typeof m.type!=='string'||!m.type.trim()||!Array.isArray(m.items)||m.items.length<1||m.items.length>50)throw new TypeError('Invalid meal');
+ const items=m.items.map((x,i)=>{
+  if(!legacyObject(x)||typeof x.name!=='string'||!x.name.trim()||typeof x.amount!=='string'||!x.amount.trim())throw new TypeError('Invalid item '+i);
+  if(x.vals!=null&&!legacyObject(x.vals))throw new TypeError('Invalid values');
+  return {name:x.name,amount:x.amount,estimated:x.estimated===true,grams:numeric(x.grams,'grams'),source:typeof x.source==='string'?x.source:null,matched:typeof x.matched==='string'?x.matched:null,vals:x.vals==null?null:Object.fromEntries(FIELDS.map(k=>[k,numeric(x.vals[k],k)]))};
+ });
+ if(m.nutritionCoverage!==undefined&&(!Array.isArray(m.nutritionCoverage)||m.nutritionCoverage.length!==FIELDS.length||m.nutritionCoverage.some(v=>!Number.isInteger(v)||v<0||v>items.length)))throw new TypeError('Invalid coverage');
+ return {schemaVersion:'1.0.0-draft',legacyId:m.id==null?null:String(m.id),date:m.date,type:m.type.trim(),note:typeof m.note==='string'?m.note:'',items,nutrition:{...Object.fromEntries(FIELDS.map(k=>[k,numeric(m[k],k)])),water:numeric(m.water,'water')},incomplete:m.incomplete===true||items.some(x=>!x.estimated||x.vals===null),nutritionCoverage:m.nutritionCoverage??null,recognition:{source:'legacy',userConfirmed:false,imageStored:false},deletedAt:null,createdAt:null,updatedAt:null};
+}
+
+// nutrition-draft.mjs
+// Pure calculation module for local draft. Supplied database entries are per 100g.
+
+function calculateMeal(rows, database){
+ if(!Array.isArray(rows)||rows.length<1||rows.length>50)throw new TypeError('Expected 1-50 food rows');
+ const items=[],coverage=Object.fromEntries(FIELDS.map(k=>[k,0]));
+ const sums=Object.fromEntries(FIELDS.map(k=>[k,0]));
+ for(const [index,row] of rows.entries()){
+  if(typeof row.name!=='string'||!row.name.trim()||typeof row.grams!=='number'||!Number.isFinite(row.grams)||row.grams<=0||row.grams>10000)throw new TypeError('Invalid food row '+index);
+  const ref=database.find(f=>f.id===row.foodId);
+  if(!ref)throw new TypeError('Food not matched to reference: '+index);
+  const vals={};
+  for(const k of FIELDS){const v=ref.values[k];if(v==null){vals[k]=null;continue;}
+   if(typeof v!=='number'||!Number.isFinite(v)||v<0)throw new TypeError('Invalid reference nutrient '+k);
+   vals[k]=v*row.grams/100;sums[k]+=vals[k];coverage[k]++;
+  }
+  items.push({name:row.name,amount:row.grams+'g',estimated:true,grams:row.grams,source:ref.source,matched:ref.name,vals});
+ }
+ const nutrition=Object.fromEntries(FIELDS.map(k=>[k,coverage[k]===0?null:sums[k]]));
+ const incomplete=FIELDS.some(k=>coverage[k]<items.length);
+ return {items,nutrition,nutritionCoverage:FIELDS.map(k=>coverage[k]),incomplete};
+}
+
+// recognition-validator.mjs
+// DRAFT ONLY: Gemini response validation; no API calls.
+const candidateObject=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+function validateCandidates(payload){
+ if(!candidateObject(payload)||!Array.isArray(payload.items)||payload.items.length<1||payload.items.length>50)return {valid:false,error:'Items must be 1–50'};
+ for(const [i,x] of payload.items.entries()){
+  if(!candidateObject(x)||typeof x.food_name!=='string'||!x.food_name.trim()||x.food_name.length>100)return {valid:false,error:'Invalid name '+i};
+  if(typeof x.estimated_weight_g!=='number'||!Number.isFinite(x.estimated_weight_g)||x.estimated_weight_g<=0||x.estimated_weight_g>10000)return {valid:false,error:'Invalid weight '+i};
+  if(x.cooking_method!=null&&typeof x.cooking_method!=='string')return {valid:false,error:'Invalid cooking method '+i};
+  if(x.uncertainty_notes!=null&&typeof x.uncertainty_notes!=='string')return {valid:false,error:'Invalid uncertainty '+i};
+ }
+ return {valid:true,items:payload.items.map(x=>({food_name:x.food_name.trim(),estimated_weight_g:x.estimated_weight_g,cooking_method:x.cooking_method??null,uncertainty_notes:x.uncertainty_notes??null,confirmed_weight_g:null,nutrition_food_id:null,user_confirmed:false}))};
+}
+function canSave(items){return Array.isArray(items)&&items.length>0&&items.every(x=>x?.user_confirmed===true&&typeof x.nutrition_food_id==='string'&&x.nutrition_food_id.length>0&&typeof x.confirmed_weight_g==='number'&&Number.isFinite(x.confirmed_weight_g)&&x.confirmed_weight_g>0);}
+
+// draft-ui.mjs
+
+
+
+const $=id=>document.getElementById(id);
+const db=[{"id": "demo-rice", "name": "白飯（虛構測試）", "source": "虛構示範資料／非食藥署", "values": {"cal": 130, "pro": 2.5, "carb": 28, "fat": 0.3}}, {"id": "demo-egg", "name": "雞蛋（虛構測試）", "source": "虛構示範資料／非食藥署", "values": {"cal": 145, "pro": 12.5, "carb": 1, "fat": 10}}, {"id": "demo-veg", "name": "青菜（虛構測試）", "source": "虛構示範資料／非食藥署", "values": {"cal": 25, "pro": 2, "carb": 4, "fat": 0.2, "fiber": 2}}];
+let rows=[],nextId=1;
+const candidateFixture={items:[{food_name:'白飯',estimated_weight_g:85,uncertainty_notes:'重量僅為虛構示範'}, {food_name:'雞蛋',estimated_weight_g:50,uncertainty_notes:'重量僅為虛構示範'}]};
+function addRow(name='',grams=100,foodId=''){
+ if(rows.length>=50){status('最多 50 項食材');return;}
+ rows.push({id:nextId++,name,grams,foodId,confirmed:false});render();
+}
+function status(message){$('status').textContent=message;}
+function render(){
+ const root=$('rows');root.replaceChildren();
+ for(const row of rows){
+  const section=document.createElement('section');section.className='foodrow';
+  const name=document.createElement('input');name.placeholder='食材名稱';name.value=row.name;name.setAttribute('aria-label','食材名稱');name.addEventListener('input',()=>{row.name=name.value;row.confirmed=false;updateButtons();});
+  const weight=document.createElement('input');weight.type='number';weight.min='0.1';weight.max='10000';weight.step='0.1';weight.value=row.grams;weight.setAttribute('aria-label','重量（公克）');weight.addEventListener('input',()=>{row.grams=Number(weight.value);row.confirmed=false;updateButtons();});
+  const select=document.createElement('select');select.setAttribute('aria-label','對應營養資料');
+  for(const item of [{id:'',name:'請選擇對應資料'},...db]){const opt=document.createElement('option');opt.value=item.id;opt.textContent=item.name;select.append(opt);}select.value=row.foodId;
+  select.addEventListener('change',()=>{row.foodId=select.value;row.confirmed=false;updateButtons();});
+  const confirm=document.createElement('button');confirm.textContent=row.confirmed?'✓ 已確認':'確認此項';confirm.className='secondary';confirm.addEventListener('click',()=>{
+   if(!row.name.trim()||!(row.grams>0)||row.grams>10000||!row.foodId){status('請先填食材名稱、有效重量及對應資料');return;}
+   row.confirmed=true;render();status('已確認一項食材');
+  });
+  const remove=document.createElement('button');remove.textContent='移除';remove.className='danger';remove.addEventListener('click',()=>{rows=rows.filter(x=>x.id!==row.id);render();});
+  section.append(name,weight,select,confirm,remove);root.append(section);
+ }
+ updateButtons();
+}
+function updateButtons(){const ready=rows.length>0&&rows.every(x=>x.confirmed&&x.foodId&&x.name.trim()&&x.grams>0);$('calculate').disabled=!ready;$('count').textContent=`${rows.length}/50 項食材，${rows.filter(x=>x.confirmed).length} 項已確認`;}
+$('add').addEventListener('click',()=>addRow());
+$('mock').addEventListener('click',()=>{
+ const result=validateCandidates(candidateFixture);if(!result.valid){status(result.error);return;}
+ rows=[];for(const x of result.items)addRow(x.food_name,x.estimated_weight_g,'');
+ status('已載入虛構 AI 辨識結果。這不是實際照片辨識，請逐項修改及確認。');
+});
+$('calculate').addEventListener('click',()=>{
+ try{
+  const candidates=rows.map(x=>({user_confirmed:x.confirmed,nutrition_food_id:x.foodId,confirmed_weight_g:x.grams}));
+  if(!canSave(candidates))throw new Error('所有食材都必須經人工確認');
+  const result=calculateMeal(rows,db);
+  const legacy={id:'fictional-local-preview',date:'2026-01-05',type:'午餐',note:'虛構本地測試',items:result.items,
+   ...result.nutrition,nutritionCoverage:result.nutritionCoverage,incomplete:result.incomplete};
+  const draft=adaptLegacyMeal(legacy);
+  $('cal').textContent=draft.nutrition.cal?.toFixed(1)??'未知';
+  $('pro').textContent=draft.nutrition.pro?.toFixed(1)??'未知';
+  $('coverage').textContent=draft.incomplete?'部分營養素缺資料，整餐營養不完整':'資料完整';
+  $('output').textContent=JSON.stringify(draft,null,2);
+  status('已完成本地計算及資料轉換；未儲存、未上傳。');
+ }catch(err){status('無法計算：'+err.message);}
+});
+addRow();
+
+</script></body></html>
