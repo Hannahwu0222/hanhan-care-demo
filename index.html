@@ -1,117 +1,86 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>HanHan Care｜本地草稿測試</title>
-<style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#333344;background:#f5f2f6}body{max-width:920px;margin:25px auto;padding:0 15px}header,main{background:white;border-radius:16px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px #2520300a}h1{font-size:24px;margin:0 0 8px}h2{font-size:18px}.notice{background:#f3e9f4;padding:12px;border-radius:10px}button{border:0;border-radius:8px;background:#77648e;color:white;padding:10px 13px;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#ede6f2;color:#58476b}.danger{background:#f9e8e8;color:#934c4c}.foodrow{display:grid;grid-template-columns:1.3fr .7fr 1.4fr auto auto;gap:7px;padding:12px 0;border-bottom:1px solid #eee}input,select{box-sizing:border-box;width:100%;padding:9px;border:1px solid #d6ccd9;border-radius:8px;min-width:0}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f6f8;padding:14px;border-radius:10px;max-height:330px;overflow:auto}#status{color:#745478;min-height:1.5em}.totals{display:flex;gap:30px;flex-wrap:wrap}small{color:#666}@media(max-width:680px){.foodrow{grid-template-columns:1fr 1fr}.foodrow select{grid-column:1/-1}}</style></head><body>
-<header><h1>HanHan Care｜餐點整合草稿</h1><p class="notice"><strong>平板單檔離線示範。</strong>所有食物數據及 AI 辨識結果均為虛構測試資料，非食藥署資料、非 Gemini 真正辨識；不儲存、不連網傳送健康資料。</p><small>不需要 Python 或網頁伺服器。與正式 V1.9.0 完全分離，不覆蓋原始程式。</small></header>
-<main><h2>食材輸入與人工確認</h2><p id="count"></p><div id="rows"></div><div class="actions"><button id="add">＋ 增加食材</button><button id="mock" class="secondary">載入虛構 AI 辨識示範</button><button id="calculate" disabled>確認全部並計算</button></div><p id="status" role="status"></p></main>
-<main><h2>整餐營養結果（示範）</h2><div class="totals"><p>熱量 <strong id="cal">—</strong> kcal</p><p>蛋白質 <strong id="pro">—</strong> g</p></div><p id="coverage">尚未計算</p><details><summary>查看新版餐點 JSON 草稿</summary><pre id="output">尚未產生</pre></details></main>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B3</title>
+<style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#373344;background:#f5f2f6}body{max-width:1000px;margin:20px auto;padding:0 14px}header,main{background:#fff;border-radius:17px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px #2520300a}h1{font-size:24px;margin:0 0 10px}h2{font-size:18px}.notice{background:#f2eaf4;padding:13px;border-radius:10px;line-height:1.65}button{border:0;border-radius:9px;background:#77648e;color:white;padding:10px 13px;cursor:pointer}button:disabled{opacity:.4}.secondary{background:#ece5f1;color:#59446b}.danger{background:#f9e8e8;color:#934c4c}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.foodrow{display:grid;grid-template-columns:1.1fr .7fr 1.4fr auto auto;gap:8px;padding:13px 0;border-bottom:1px solid #eee}input,select{box-sizing:border-box;width:100%;padding:9px;border:1px solid #d6ccd9;border-radius:8px;min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f6f8;padding:12px;max-height:320px;overflow:auto}.muted{color:#6d6774;font-size:14px}.status{min-height:1.5em;color:#765b7b}.stats{display:flex;gap:28px;flex-wrap:wrap}label{display:block;margin:7px 0}small{color:#706b76}@media(max-width:700px){.foodrow{grid-template-columns:1fr 1fr}.foodrow select{grid-column:1/-1}header,main{padding:15px}}</style></head><body>
+<header><h1>HanHan Care｜營養資料庫整合草稿 B3</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；不儲存、不上傳資料。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」且所有資料只在本頁記憶體中使用，重新整理即清除。</p><p class="muted">此版沿用 V1.9.0 的 CSV 解析、營養素欄位辨識與單位換算程式；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
+<main><h2>① 選擇食物資料來源</h2><p class="muted">可先載入 10 項<b>虛構測試資料</b>測試流程；或選擇符合 V1.9.0 格式的食藥署 CSV。不要上傳包含個人紀錄的 JSON 備份。</p><div class="actions"><button id="fixture" class="secondary">載入虛構食物資料</button><input id="csv" type="file" accept=".csv,text/csv" aria-label="選擇官方食物 CSV"></div><p id="dbStatus" class="status" role="status">尚未載入資料庫</p></main>
+<main><h2>② 食材輸入與確認</h2><p class="muted">最多 50 項；輸入公克數。官方品項需要逐項選擇，不會自行猜測雞胸肉品種。</p><p id="count"></p><div id="rows"></div><div class="actions"><button id="add">＋ 增加食材</button><button id="mock" class="secondary">載入虛構辨識示範</button><button id="calculate" disabled>確認全部並計算</button></div><p id="status" class="status" role="status"></p></main>
+<main><h2>③ 整餐營養結果</h2><div class="stats"><p>熱量 <b id="cal">—</b> kcal</p><p>蛋白質 <b id="pro">—</b> g</p></div><p id="coverage">尚未計算</p><details><summary>展開 24 項營養素與完整性</summary><div id="nutrients"></div></details><details><summary>查看餐點 JSON 草稿（不會上傳）</summary><pre id="output">尚未產生</pre></details></main>
 <script>
-// meal-adapter.mjs
-// DRAFT ONLY: no network, persistence or cloud operations.
-const FIELDS = Object.freeze(["cal", "pro", "carb", "fat", "fiber", "vitA", "b1", "b2", "b6", "folate", "vitC", "vitE", "calcium", "phosphorus", "magnesium", "potassium", "sodium", "iron", "zinc", "selenium", "copper", "manganese", "germanium", "cobalt"]);
-const legacyObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
-const dateOK = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s+'T00:00:00Z')) && new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
-function numeric(v,key){if(v===null||v===undefined||v==='')return null;if(typeof v!=='number'||!Number.isFinite(v)||v<0)throw new TypeError('Invalid '+key);return v;}
-function adaptLegacyMeal(m){
- if(!legacyObject(m)||!dateOK(m.date)||typeof m.type!=='string'||!m.type.trim()||!Array.isArray(m.items)||m.items.length<1||m.items.length>50)throw new TypeError('Invalid meal');
- const items=m.items.map((x,i)=>{
-  if(!legacyObject(x)||typeof x.name!=='string'||!x.name.trim()||typeof x.amount!=='string'||!x.amount.trim())throw new TypeError('Invalid item '+i);
-  if(x.vals!=null&&!legacyObject(x.vals))throw new TypeError('Invalid values');
-  return {name:x.name,amount:x.amount,estimated:x.estimated===true,grams:numeric(x.grams,'grams'),source:typeof x.source==='string'?x.source:null,matched:typeof x.matched==='string'?x.matched:null,vals:x.vals==null?null:Object.fromEntries(FIELDS.map(k=>[k,numeric(x.vals[k],k)]))};
- });
- if(m.nutritionCoverage!==undefined&&(!Array.isArray(m.nutritionCoverage)||m.nutritionCoverage.length!==FIELDS.length||m.nutritionCoverage.some(v=>!Number.isInteger(v)||v<0||v>items.length)))throw new TypeError('Invalid coverage');
- return {schemaVersion:'1.0.0-draft',legacyId:m.id==null?null:String(m.id),date:m.date,type:m.type.trim(),note:typeof m.note==='string'?m.note:'',items,nutrition:{...Object.fromEntries(FIELDS.map(k=>[k,numeric(m[k],k)])),water:numeric(m.water,'water')},incomplete:m.incomplete===true||items.some(x=>!x.estimated||x.vals===null),nutritionCoverage:m.nutritionCoverage??null,recognition:{source:'legacy',userConfirmed:false,imageStored:false},deletedAt:null,createdAt:null,updatedAt:null};
-}
-
-// nutrition-draft.mjs
-// Pure calculation module for local draft. Supplied database entries are per 100g.
-
-function calculateMeal(rows, database){
- if(!Array.isArray(rows)||rows.length<1||rows.length>50)throw new TypeError('Expected 1-50 food rows');
- const items=[],coverage=Object.fromEntries(FIELDS.map(k=>[k,0]));
- const sums=Object.fromEntries(FIELDS.map(k=>[k,0]));
- for(const [index,row] of rows.entries()){
-  if(typeof row.name!=='string'||!row.name.trim()||typeof row.grams!=='number'||!Number.isFinite(row.grams)||row.grams<=0||row.grams>10000)throw new TypeError('Invalid food row '+index);
-  const ref=database.find(f=>f.id===row.foodId);
-  if(!ref)throw new TypeError('Food not matched to reference: '+index);
-  const vals={};
-  for(const k of FIELDS){const v=ref.values[k];if(v==null){vals[k]=null;continue;}
-   if(typeof v!=='number'||!Number.isFinite(v)||v<0)throw new TypeError('Invalid reference nutrient '+k);
-   vals[k]=v*row.grams/100;sums[k]+=vals[k];coverage[k]++;
-  }
-  items.push({name:row.name,amount:row.grams+'g',estimated:true,grams:row.grams,source:ref.source,matched:ref.name,vals});
- }
- const nutrition=Object.fromEntries(FIELDS.map(k=>[k,coverage[k]===0?null:sums[k]]));
- const incomplete=FIELDS.some(k=>coverage[k]<items.length);
- return {items,nutrition,nutritionCoverage:FIELDS.map(k=>coverage[k]),incomplete};
-}
-
-// recognition-validator.mjs
-// DRAFT ONLY: Gemini response validation; no API calls.
-const candidateObject=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
-function validateCandidates(payload){
- if(!candidateObject(payload)||!Array.isArray(payload.items)||payload.items.length<1||payload.items.length>50)return {valid:false,error:'Items must be 1–50'};
- for(const [i,x] of payload.items.entries()){
-  if(!candidateObject(x)||typeof x.food_name!=='string'||!x.food_name.trim()||x.food_name.length>100)return {valid:false,error:'Invalid name '+i};
-  if(typeof x.estimated_weight_g!=='number'||!Number.isFinite(x.estimated_weight_g)||x.estimated_weight_g<=0||x.estimated_weight_g>10000)return {valid:false,error:'Invalid weight '+i};
-  if(x.cooking_method!=null&&typeof x.cooking_method!=='string')return {valid:false,error:'Invalid cooking method '+i};
-  if(x.uncertainty_notes!=null&&typeof x.uncertainty_notes!=='string')return {valid:false,error:'Invalid uncertainty '+i};
- }
- return {valid:true,items:payload.items.map(x=>({food_name:x.food_name.trim(),estimated_weight_g:x.estimated_weight_g,cooking_method:x.cooking_method??null,uncertainty_notes:x.uncertainty_notes??null,confirmed_weight_g:null,nutrition_food_id:null,user_confirmed:false}))};
-}
-function canSave(items){return Array.isArray(items)&&items.length>0&&items.every(x=>x?.user_confirmed===true&&typeof x.nutrition_food_id==='string'&&x.nutrition_food_id.length>0&&typeof x.confirmed_weight_g==='number'&&Number.isFinite(x.confirmed_weight_g)&&x.confirmed_weight_g>0);}
-
-// draft-ui.mjs
-
-
-
+'use strict';
+const fields=["cal", "pro", "carb", "fat", "fiber", "vitA", "b1", "b2", "b6", "folate", "vitC", "vitE", "calcium", "phosphorus", "magnesium", "potassium", "sodium", "iron", "zinc", "selenium", "copper", "manganese", "germanium", "cobalt"];
 const $=id=>document.getElementById(id);
-const db=[{"id": "demo-rice", "name": "白飯（虛構測試）", "source": "虛構示範資料／非食藥署", "values": {"cal": 130, "pro": 2.5, "carb": 28, "fat": 0.3}}, {"id": "demo-egg", "name": "雞蛋（虛構測試）", "source": "虛構示範資料／非食藥署", "values": {"cal": 145, "pro": 12.5, "carb": 1, "fat": 10}}, {"id": "demo-veg", "name": "青菜（虛構測試）", "source": "虛構示範資料／非食藥署", "values": {"cal": 25, "pro": 2, "carb": 4, "fat": 0.2, "fiber": 2}}];
-let rows=[],nextId=1;
-const candidateFixture={items:[{food_name:'白飯',estimated_weight_g:85,uncertainty_notes:'重量僅為虛構示範'}, {food_name:'雞蛋',estimated_weight_g:50,uncertainty_notes:'重量僅為虛構示範'}]};
-function addRow(name='',grams=100,foodId=''){
- if(rows.length>=50){status('最多 50 項食材');return;}
- rows.push({id:nextId++,name,grams,foodId,confirmed:false});render();
-}
-function status(message){$('status').textContent=message;}
-function render(){
- const root=$('rows');root.replaceChildren();
- for(const row of rows){
-  const section=document.createElement('section');section.className='foodrow';
-  const name=document.createElement('input');name.placeholder='食材名稱';name.value=row.name;name.setAttribute('aria-label','食材名稱');name.addEventListener('input',()=>{row.name=name.value;row.confirmed=false;updateButtons();});
-  const weight=document.createElement('input');weight.type='number';weight.min='0.1';weight.max='10000';weight.step='0.1';weight.value=row.grams;weight.setAttribute('aria-label','重量（公克）');weight.addEventListener('input',()=>{row.grams=Number(weight.value);row.confirmed=false;updateButtons();});
-  const select=document.createElement('select');select.setAttribute('aria-label','對應營養資料');
-  for(const item of [{id:'',name:'請選擇對應資料'},...db]){const opt=document.createElement('option');opt.value=item.id;opt.textContent=item.name;select.append(opt);}select.value=row.foodId;
-  select.addEventListener('change',()=>{row.foodId=select.value;row.confirmed=false;updateButtons();});
-  const confirm=document.createElement('button');confirm.textContent=row.confirmed?'✓ 已確認':'確認此項';confirm.className='secondary';confirm.addEventListener('click',()=>{
-   if(!row.name.trim()||!(row.grams>0)||row.grams>10000||!row.foodId){status('請先填食材名稱、有效重量及對應資料');return;}
-   row.confirmed=true;render();status('已確認一項食材');
-  });
-  const remove=document.createElement('button');remove.textContent='移除';remove.className='danger';remove.addEventListener('click',()=>{rows=rows.filter(x=>x.id!==row.id);render();});
-  section.append(name,weight,select,confirm,remove);root.append(section);
- }
- updateButtons();
-}
-function updateButtons(){const ready=rows.length>0&&rows.every(x=>x.confirmed&&x.foodId&&x.name.trim()&&x.grams>0);$('calculate').disabled=!ready;$('count').textContent=`${rows.length}/50 項食材，${rows.filter(x=>x.confirmed).length} 項已確認`;}
-$('add').addEventListener('click',()=>addRow());
-$('mock').addEventListener('click',()=>{
- const result=validateCandidates(candidateFixture);if(!result.valid){status(result.error);return;}
- rows=[];for(const x of result.items)addRow(x.food_name,x.estimated_weight_g,'');
- status('已載入虛構 AI 辨識結果。這不是實際照片辨識，請逐項修改及確認。');
-});
-$('calculate').addEventListener('click',()=>{
- try{
-  const candidates=rows.map(x=>({user_confirmed:x.confirmed,nutrition_food_id:x.foodId,confirmed_weight_g:x.grams}));
-  if(!canSave(candidates))throw new Error('所有食材都必須經人工確認');
-  const result=calculateMeal(rows,db);
-  const legacy={id:'fictional-local-preview',date:'2026-01-05',type:'午餐',note:'虛構本地測試',items:result.items,
-   ...result.nutrition,nutritionCoverage:result.nutritionCoverage,incomplete:result.incomplete};
-  const draft=adaptLegacyMeal(legacy);
-  $('cal').textContent=draft.nutrition.cal?.toFixed(1)??'未知';
-  $('pro').textContent=draft.nutrition.pro?.toFixed(1)??'未知';
-  $('coverage').textContent=draft.incomplete?'部分營養素缺資料，整餐營養不完整':'資料完整';
-  $('output').textContent=JSON.stringify(draft,null,2);
-  status('已完成本地計算及資料轉換；未儲存、未上傳。');
- }catch(err){status('無法計算：'+err.message);}
-});
-addRow();
+let database=[],rows=[],nextId=1,dbKind='none';
+function csvParse(t){let rows=[],r=[],v='',quoted=false;for(let i=0;i<t.length;i++){let c=t[i];if(quoted){if(c==='"'&&t[i+1]==='"'){v+='"';i++}else if(c==='"')quoted=false;else v+=c}else if(c==='"')quoted=true;else if(c===','){r.push(v);v=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;r.push(v);v='';if(r.some(x=>x.trim()))rows.push(r);r=[]}else v+=c}r.push(v);if(r.some(x=>x.trim()))rows.push(r);return rows}
+function numericNutrient(v){let t=String(v??'').trim().replace(/,/g,'');if(!t||/^(?:-|—|－|tr|trace|未檢出|微量|nd|n\.d\.)$/i.test(t))return null;let n=Number(t);return Number.isFinite(n)&&n>=0?n:null}
+function nutrientKey(n){let x=String(n).replace(/\s/g,'').toLowerCase();
+if(/維生素a|視網醇當量|維生素ａ/.test(x))return 'vitA';
+if(/維生素b1|硫胺素|thiamin/.test(x))return 'b1';
+if(/維生素b2|核黃素|riboflavin/.test(x))return 'b2';
+if(/維生素b6|吡哆醇|pyridoxine/.test(x))return 'b6';
+if(/葉酸|folate/.test(x))return 'folate';
+if(/維生素c|抗壞血酸|ascorbic/.test(x))return 'vitC';
+if(/維生素e|α-生育醇當量|alpha-tocopherol/.test(x))return 'vitE';
+if(/^鈣|^calcium/.test(x))return 'calcium';if(/^磷|^phosphorus/.test(x))return 'phosphorus';
+if(/^鎂|^magnesium/.test(x))return 'magnesium';if(/^鉀|^potassium/.test(x))return 'potassium';
+if(/^鈉|^sodium/.test(x))return 'sodium';if(/^鐵|^iron/.test(x))return 'iron';
+if(/^鋅|^zinc/.test(x))return 'zinc';if(/^硒|^selenium/.test(x))return 'selenium';
+if(/^銅|^copper/.test(x))return 'copper';if(/^錳|^manganese/.test(x))return 'manganese';
+if(/^鍺|^germanium/.test(x))return 'germanium';if(/^鈷|^cobalt/.test(x))return 'cobalt';
+if(/修正熱量|^熱量/.test(x))return'cal';
+if(/粗蛋白|^蛋白質/.test(x))return'pro';
+if(/總碳水化合物|^碳水化合物/.test(x))return'carb';
+if(/粗脂肪|^脂肪/.test(x)&&!/脂肪酸/.test(x))return'fat';
+if(/膳食纖維/.test(x))return'fiber';return null}
+const nutrientInfo={cal:['熱量','kcal'],pro:['蛋白質','g'],carb:['碳水化合物','g'],fat:['脂肪','g'],fiber:['膳食纖維','g'],vitA:['維生素A','μg RE'],b1:['維生素B1','mg'],b2:['維生素B2','mg'],b6:['維生素B6','mg'],folate:['葉酸','μg'],vitC:['維生素C','mg'],vitE:['維生素E','mg'],calcium:['鈣','mg'],phosphorus:['磷','mg'],magnesium:['鎂','mg'],potassium:['鉀','mg'],sodium:['鈉','mg'],iron:['鐵','mg'],zinc:['鋅','mg'],selenium:['硒','μg'],copper:['銅','mg'],manganese:['錳','mg'],germanium:['鍺','μg'],cobalt:['鈷','μg']};
+function normalizeNutrient(v,unit,key){if(v===null)return null;let u=String(unit||'').trim().toLowerCase().replace(/μ/g,'µ').replace(/微公克|微克/g,'µg').replace(/毫克/g,'mg').replace(/公克/g,'g');let target=nutrientInfo[key][1].toLowerCase().replace(/μ/g,'µ');if(!u)return null;if(key==='cal')return /kcal|大卡|千卡/.test(u)?v:null;
+if(target==='g'){if(u==='g')return v;if(u==='mg')return v/1000;if(u==='µg'||u==='ug')return v/1e6;return null}
+if(target==='mg'){if(u==='mg')return v;if(u==='g')return v*1000;if(u==='µg'||u==='ug')return v/1000;return null}
+if(target==='µg'||target==='µg re'){if(u==='µg'||u==='ug'||u==='µg re'||u==='µgre')return v;if(u==='mg')return v*1000;return null}
+return null}
+function importOfficialRows(rows){if(!rows.length)throw Error('空白 CSV');
+let head=rows[0].map(x=>x.replace(/^\ufeff/,'').trim()),ix=k=>head.indexOf(k);
+if(['樣品名稱','分析項','每100克含量'].some(k=>ix(k)<0))throw Error('欄位不符：需要樣品名稱、分析項、每100克含量');
+if(ix('含量單位')<0)throw Error('缺少含量單位，無法安全換算維生素及礦物質');
+let groups=new Map(),matched={};
+for(let r of rows.slice(1)){let name=(r[ix('樣品名稱')]||'').trim(),item=r[ix('分析項')]||'',key=nutrientKey(item),unit=r[ix('含量單位')]||'';if(!name)continue;
+let id=(ix('整合編號')>=0?r[ix('整合編號')]:'')||name;
+let g=groups.get(id);if(!g){g={name,aliases:[],values:Object.fromEntries(fields.map(k=>[k,null])),source:'食藥署匯入CSV'};groups.set(id,g)}
+if(ix('俗名')>=0){let a=(r[ix('俗名')]||'').split(/[、,，;；\/]/).map(x=>x.trim()).filter(Boolean);g.aliases=[...new Set([...g.aliases,...a])]}
+if(key){let raw=numericNutrient(r[ix('每100克含量')]),val=normalizeNutrient(raw,unit,key);if(val!==null&&g.values[key]===null){g.values[key]=val;matched[key]=(matched[key]||0)+1}}}
+let result=[...groups.values()].filter(x=>Object.values(x.values).some(v=>v!==null));if(result.length<10)throw Error('解析有效食物少於10筆');window.lastImportCounts=matched;return result}
 
+function normFood(s){return String(s||'').replace(/[\s（）()\-]/g,'').toLowerCase()}
+const aliases={'高麗菜':['甘藍','結球甘藍'],'地瓜':['甘藷','番薯'],'台灣鯛':['吳郭魚','鯛魚'],'番茄':['蕃茄']};
+function candidates(name){const q=normFood(name), keys=[q,...(aliases[name]||[]).map(normFood)];if(!q)return [];
+ const exact=database.filter(f=>keys.some(k=>k&&(normFood(f.name)===k||(f.aliases||[]).some(a=>normFood(a)===k))));
+ const fuzzy=database.filter(f=>!exact.includes(f)&&keys.some(k=>k.length>1&&(normFood(f.name).includes(k)||(f.aliases||[]).some(a=>normFood(a).includes(k)))));
+ const chicken=/雞胸|胸肉/.test(q)?database.filter(f=>/雞/.test(f.name)&&/胸|里肌/.test(f.name)):[];
+ return [...new Set([...exact,...chicken,...fuzzy])].slice(0,24);
+}
+function setStatus(s){$('status').textContent=s}
+function addRow(name='',grams=100){if(rows.length>=50){setStatus('最多 50 項食材');return}rows.push({id:nextId++,name,grams,foodIndex:-1,confirmed:false});render()}
+function invalidate(row){row.confirmed=false;$('cal').textContent='—';$('pro').textContent='—';$('coverage').textContent='資料已修改，請重新確認並計算';$('nutrients').replaceChildren();$('output').textContent='尚未產生';updateButtons()}
+function render(){const root=$('rows');root.replaceChildren();for(const row of rows){const el=document.createElement('section');el.className='foodrow';
+ const name=document.createElement('input');name.placeholder='食材名稱';name.value=row.name;name.setAttribute('aria-label','食材名稱');name.addEventListener('input',()=>{row.name=name.value;row.foodIndex=-1;invalidate(row);refreshSelect()});
+ const weight=document.createElement('input');weight.type='number';weight.min='0.1';weight.max='10000';weight.step='0.1';weight.value=row.grams;weight.setAttribute('aria-label','重量（公克）');weight.addEventListener('input',()=>{row.grams=Number(weight.value);invalidate(row)});
+ const select=document.createElement('select');select.setAttribute('aria-label','對應食物資料');
+ function refreshSelect(){select.replaceChildren();const blank=document.createElement('option');blank.value='-1';blank.textContent=database.length?'請選擇對應品項':'請先載入資料庫';select.append(blank);for(const f of candidates(row.name)){const i=database.indexOf(f),opt=document.createElement('option');opt.value=String(i);opt.textContent=f.name;select.append(opt)}select.value=String(row.foodIndex);if(select.selectedIndex<0)select.value='-1'}refreshSelect();
+ select.addEventListener('change',()=>{row.foodIndex=Number(select.value);invalidate(row)});
+ const confirm=document.createElement('button');confirm.className='secondary';confirm.textContent=row.confirmed?'✓ 已確認':'確認此項';confirm.addEventListener('click',()=>{if(!row.name.trim()||!(row.grams>0)||row.grams>10000||!database[row.foodIndex]){setStatus('請先填寫食材、有效重量並選擇資料庫品項');return}row.confirmed=true;render();setStatus('已確認一項食材')});
+ const remove=document.createElement('button');remove.className='danger';remove.textContent='移除';remove.addEventListener('click',()=>{rows=rows.filter(x=>x.id!==row.id);render();$('coverage').textContent='資料已修改，請重新計算'});
+ el.append(name,weight,select,confirm,remove);root.append(el)}updateButtons()}
+function updateButtons(){const ready=rows.length>0&&rows.every(r=>r.confirmed&&r.name.trim()&&r.grams>0&&r.grams<=10000&&database[r.foodIndex]);$('calculate').disabled=!ready;$('count').textContent=`${rows.length}/50 項食材，${rows.filter(r=>r.confirmed).length} 項已確認`}
+function calculateMeal(){if(rows.length<1||rows.length>50||!rows.every(r=>r.confirmed&&database[r.foodIndex]))throw Error('請先確認全部食材');
+ const sums=Object.fromEntries(fields.map(k=>[k,0])),coverage=Object.fromEntries(fields.map(k=>[k,0]));const items=[];
+ for(const r of rows){const f=database[r.foodIndex],vals={};for(const k of fields){const v=f.values[k];if(v==null){vals[k]=null;continue}if(typeof v!=='number'||!Number.isFinite(v)||v<0)throw Error('資料庫數值錯誤：'+k);vals[k]=v*r.grams/100;sums[k]+=vals[k];coverage[k]++}items.push({name:r.name,amount:r.grams+'g',grams:r.grams,estimated:true,matched:f.name,source:f.source,vals})}
+ const nutrition=Object.fromEntries(fields.map(k=>[k,coverage[k]===0?null:sums[k]]));const incomplete=fields.some(k=>coverage[k]<rows.length);
+ return {items,nutrition,nutritionCoverage:fields.map(k=>coverage[k]),incomplete};}
+function showResult(r){const fmt=v=>v===null?'未知':(Math.round(v*100)/100).toString();$('cal').textContent=fmt(r.nutrition.cal);$('pro').textContent=fmt(r.nutrition.pro);$('coverage').textContent=r.incomplete?'部分營養素缺資料，整餐營養不完整':'全部營養素皆有資料';
+ const box=$('nutrients');box.replaceChildren();for(const k of fields){const p=document.createElement('p');p.textContent=k+'：'+fmt(r.nutrition[k])+'（'+r.nutritionCoverage[fields.indexOf(k)]+'/'+r.items.length+' 項有資料）';box.append(p)}
+ $('output').textContent=JSON.stringify({schemaVersion:'1.0.0-draft',items:r.items,nutrition:r.nutrition,nutritionCoverage:r.nutritionCoverage,incomplete:r.incomplete,recognition:{source:'manual-or-demo',userConfirmed:true,imageStored:false},deletedAt:null},null,2)}
+function loadDatabase(d,kind){database=d;dbKind=kind;for(const r of rows){r.foodIndex=-1;r.confirmed=false}render();$('dbStatus').textContent=`已載入 ${d.length} 項${kind==='fictional'?'虛構測試':'CSV 匯入'}食物；資料只在本頁記憶體中。`}
+$('fixture').addEventListener('click',()=>{const names=['白飯','雞蛋','青菜','高麗菜','雞胸肉（肉雞）','雞胸肉（土雞）','豆腐','比目魚','冬瓜','牛腱'];loadDatabase(names.map((name,i)=>({name,aliases:[],source:'虛構測試資料／非食藥署',values:Object.fromEntries(fields.map(k=>[k,k==='cal'?100+i*10:k==='pro'?3+i:k==='carb'?5+i:null]))})),'fictional')});
+$('csv').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;if(!/\.csv$/i.test(f.name)||f.size>25*1024*1024){$('dbStatus').textContent='請選擇 25MB 以下的 .csv 食物資料檔';return}try{const d=importOfficialRows(csvParse(await f.text()));loadDatabase(d,'official');}catch(err){$('dbStatus').textContent='CSV 匯入失敗：'+err.message}});
+$('add').addEventListener('click',()=>addRow());$('mock').addEventListener('click',()=>{rows=[];addRow('白飯',100);addRow('雞蛋',50);addRow('青菜',30);setStatus('已載入虛構辨識示範；請選擇品項、確認重量。這不是 Gemini 真正辨識。')});
+$('calculate').addEventListener('click',()=>{try{showResult(calculateMeal());setStatus('本地計算完成；未儲存、未上傳。')}catch(e){setStatus('計算失敗：'+e.message)}});
+addRow();
 </script></body></html>
