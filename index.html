@@ -1,6 +1,6 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B9.4</title>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B9.5</title>
 <style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#373344;background:#f5f2f6}body{max-width:1000px;margin:20px auto;padding:0 14px}header,main{background:#fff;border-radius:17px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px #2520300a}h1{font-size:24px;margin:0 0 10px}h2{font-size:18px}.notice{background:#f2eaf4;padding:13px;border-radius:10px;line-height:1.65}button{border:0;border-radius:9px;background:#77648e;color:white;padding:10px 13px;cursor:pointer}button:disabled{opacity:.4}.secondary{background:#ece5f1;color:#59446b}.danger{background:#f9e8e8;color:#934c4c}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.foodrow{display:grid;grid-template-columns:1.1fr .7fr 1.4fr auto auto;gap:8px;padding:13px 0;border-bottom:1px solid #eee}input,select{box-sizing:border-box;width:100%;padding:9px;border:1px solid #d6ccd9;border-radius:8px;min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f6f8;padding:12px;max-height:320px;overflow:auto}.muted{color:#6d6774;font-size:14px}.status{min-height:1.5em;color:#765b8b}.stats{display:flex;gap:28px;flex-wrap:wrap}label{display:block;margin:7px 0}small{color:#706b86}@media(max-width:700px){.foodrow{grid-template-columns:1fr 1fr}.foodrow select{grid-column:1/-1}header,main{padding:15px}}.conversion-row{grid-column:1/-1;padding:0 4px 9px}.conversion-note{margin:0;font-size:13px;line-height:1.6}#weightDetails p{margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px}</style></head><body>
-<header><h1>HanHan Care｜營養資料庫整合草稿 B9.4</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；僅在明確勾選後，將虛構測試資料儲存在本裝置瀏覽器，不會上傳伺服器。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版參考 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
+<header><h1>HanHan Care｜營養資料庫整合草稿 B9.5</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；僅在明確勾選後，將虛構測試資料儲存在本裝置瀏覽器，不會上傳伺服器。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版參考 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
 <main><h2>① 選擇食物資料來源</h2><p class="muted">可先載入 10 項<b>虛構測試資料</b>測試流程；或選擇符合 V1.9.0 格式的食物 CSV。CSV 的來源由使用者自行確認；程式不會驗證資料是否由食藥署發布。不要上傳包含個人紀錄的 JSON 備份。</p><div class="actions"><button id="fixture" class="secondary">載入虛構食物資料</button><input id="csv" type="file" accept=".csv,text/csv" aria-label="選擇官方食物 CSV"></div><p id="dbStatus" class="status" role="status">尚未載入資料庫</p>
 <details><summary>展開 CSV 匯入診斷</summary><pre id="csvDiagnostics">尚未匯入 CSV</pre></details></main>
 <main><h2>② 自訂份量換算（本次新增）</h2><p class="muted">可選擇儲存在此瀏覽器；清除網站資料會遺失，請定期匯出設定備份。預設「蛋／雞蛋／一般雞蛋」1 顆＝50g 僅供測試；鴨蛋、鵪鶉蛋等需另設份量，其他份量須自行設定；不會默默猜測半碗或一片的重量。</p><div class="actions"><input id="portionFood" placeholder="食物名稱，例如白飯" aria-label="份量食物名稱" style="max-width:210px"><select id="portionUnit" aria-label="份量單位" style="max-width:130px"><option>碗</option><option>顆</option><option>個</option><option>片</option><option>塊</option><option>湯匙</option><option>茶匙</option><option>份</option><option>口</option><option>mL</option></select><input id="portionGrams" type="number" min="0.1" step="0.1" placeholder="每單位幾公克" aria-label="每單位公克" style="max-width:165px"><button id="savePortion" class="secondary">新增換算</button></div><p id="portionStatus" class="status" role="status"></p><div id="portionList" class="muted"></div></main>
@@ -31,6 +31,12 @@
 <div class="actions"><button id="b94Check" class="secondary">檢查目前載入的食材資料庫</button><button id="b94Download" class="secondary" disabled>下載 B9.4 整合檢查 JSON</button></div>
 <pre id="b94Result" role="status">尚未檢查。請先於①匯入 B9.4 的 2,213 食材 CSV。</pre>
 <p class="muted">B9.4 不會自動上傳或改寫正式 V1.9.0；不會自動將資料同步到 Google Cloud。請勿輸入真實病患紀錄。</p></main>
+<main><h2>⑪ B9.5｜真實食材與計算一致性驗證（唯讀）</h2>
+<p class="muted">請先於①載入 B9.4 的 2,213 食材 CSV。此區會對目前資料庫做獨立計算，不修改餐點、份量設定或備份；檢查後可下載結果。注意：這是程式一致性測試，不是醫療建議。</p>
+<div class="actions"><button id="b95Run" class="secondary">執行 B9.5 一致性檢查</button><button id="b95Export" class="secondary" disabled>下載 B9.5 檢查 JSON</button></div>
+<p id="b95Status" class="status" role="status">尚未執行；請先載入 CSV。</p>
+<details open><summary>查看 B9.5 檢查結果</summary><pre id="b95Result">尚未檢查</pre></details>
+<p class="muted">驗證項目：白飯 100g/150g 比例、雞蛋 50g/25g 比例、缺值維持 null、計算不修改原始每100g數值、資料庫是否有常見食材。未找到品項會標示 SKIP，不會假裝通過。</p></main>
 <script>
 'use strict';
 const fields=["cal", "pro", "carb", "fat", "fiber", "vitA", "b1", "b2", "b6", "folate", "vitC", "vitE", "calcium", "phosphorus", "magnesium", "potassium", "sodium", "iron", "zinc", "selenium", "copper", "manganese", "germanium", "cobalt"];
@@ -396,6 +402,45 @@ $('b94Download').addEventListener('click',()=>{
  if(!b94Report)return;
  const blob=new Blob([JSON.stringify(b94Report,null,2)],{type:'application/json'});
  const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='HanHan_B9_4_整合檢查.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);
+});
+
+
+// B9.5 deterministic read-only consistency checks, independent of UI meal state.
+let b95Report=null;
+function b95Compute(food,grams){const vals={};for(const k of fields){const v=food.values[k];vals[k]=v==null?null:v*grams/100}return vals}
+function b95Near(a,b){return typeof a==='number'&&typeof b==='number'&&Math.abs(a-b)<=Math.max(1e-8,Math.abs(b)*1e-10)}
+function b95Case(foodName,grams1,grams2){
+ const food=database.find(f=>normFood(f.name)===normFood(foodName));
+ if(!food)return {food:foodName,status:'SKIP',reason:'目前資料庫找不到完全同名品項；請勿自動套用其他品種'};
+ const before=JSON.stringify(food.values),v1=b95Compute(food,grams1),v2=b95Compute(food,grams2),checks=[];
+ for(const k of fields){const base=food.values[k];
+  if(base==null){checks.push(v1[k]===null&&v2[k]===null);continue}
+  checks.push(b95Near(v1[k],base*grams1/100)&&b95Near(v2[k],base*grams2/100));
+ }
+ const unchanged=before===JSON.stringify(food.values);
+ return {food:foodName,status:checks.every(Boolean)&&unchanged?'PASS':'FAIL',grams:[grams1,grams2],
+  calories:[v1.cal,v2.cal],protein:[v1.pro,v2.pro],missingNutrients:fields.filter(k=>food.values[k]==null),
+  validNutrientChecks:checks.filter(Boolean).length,totalNutrientChecks:checks.length,originalUnchanged:unchanged};
+}
+$('b95Run').addEventListener('click',()=>{
+ if(!database.length){$('b95Status').textContent='請先於①載入 2,213 食材 CSV';return}
+ const cases=[b95Case('白飯',100,150),b95Case('雞蛋',50,25)];
+ const examples=['雞胸肉','高麗菜','冬瓜','比目魚'].map(q=>({query:q,matches:database.filter(f=>normFood(f.name).includes(normFood(q))).slice(0,8).map(f=>f.name)}));
+ const statuses=cases.map(c=>c.status);
+ const status=statuses.includes('FAIL')?'FAIL':statuses.includes('SKIP')?'NEEDS_REVIEW':'PASS';
+ b95Report={format:'hanhan-b9.5-consistency-check',status,foodCount:database.length,
+  source:'使用者本機選擇的CSV；來源未獨立驗證',readOnly:true,
+  cases,searchExamples:examples,missingValuesPolicy:'null remains null, never converted to zero',
+  caveat:'不代表醫療適用性；不寫入正式V1.9.0、Firestore或雲端；不測試跨裝置同步'};
+ $('b95Result').textContent=JSON.stringify(b95Report,null,2);
+ $('b95Status').textContent='檢查完成：'+status+'；'+cases.map(c=>c.food+' '+c.status).join('、')+'。未修改現有餐點或設定。';
+ $('b95Export').disabled=false;
+});
+$('b95Export').addEventListener('click',()=>{
+ if(!b95Report)return;
+ const blob=new Blob([JSON.stringify(b95Report,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='HanHan_B9_5_一致性檢查.json';
+ document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2500);
 });
 
 </script></body></html>
