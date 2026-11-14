@@ -1,6 +1,6 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B9.1</title>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B9.1.1</title>
 <style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#373344;background:#f5f2f6}body{max-width:1000px;margin:20px auto;padding:0 14px}header,main{background:#fff;border-radius:17px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px #2520300a}h1{font-size:24px;margin:0 0 10px}h2{font-size:18px}.notice{background:#f2eaf4;padding:13px;border-radius:10px;line-height:1.65}button{border:0;border-radius:9px;background:#77648e;color:white;padding:10px 13px;cursor:pointer}button:disabled{opacity:.4}.secondary{background:#ece5f1;color:#59446b}.danger{background:#f9e8e8;color:#934c4c}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.foodrow{display:grid;grid-template-columns:1.1fr .7fr 1.4fr auto auto;gap:8px;padding:13px 0;border-bottom:1px solid #eee}input,select{box-sizing:border-box;width:100%;padding:9px;border:1px solid #d6ccd9;border-radius:8px;min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f6f8;padding:12px;max-height:320px;overflow:auto}.muted{color:#6d6774;font-size:14px}.status{min-height:1.5em;color:#765b8b}.stats{display:flex;gap:28px;flex-wrap:wrap}label{display:block;margin:7px 0}small{color:#706b86}@media(max-width:700px){.foodrow{grid-template-columns:1fr 1fr}.foodrow select{grid-column:1/-1}header,main{padding:15px}}.conversion-row{grid-column:1/-1;padding:0 4px 9px}.conversion-note{margin:0;font-size:13px;line-height:1.6}#weightDetails p{margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px}</style></head><body>
-<header><h1>HanHan Care｜營養資料庫整合草稿 B9.1</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；僅在明確勾選後，將虛構測試資料儲存在本裝置瀏覽器，不會上傳伺服器。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版參考 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
+<header><h1>HanHan Care｜營養資料庫整合草稿 B9.1.1</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；僅在明確勾選後，將虛構測試資料儲存在本裝置瀏覽器，不會上傳伺服器。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版參考 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
 <main><h2>① 選擇食物資料來源</h2><p class="muted">可先載入 10 項<b>虛構測試資料</b>測試流程；或選擇符合 V1.9.0 格式的食物 CSV。CSV 的來源由使用者自行確認；程式不會驗證資料是否由食藥署發布。不要上傳包含個人紀錄的 JSON 備份。</p><div class="actions"><button id="fixture" class="secondary">載入虛構食物資料</button><input id="csv" type="file" accept=".csv,text/csv" aria-label="選擇官方食物 CSV"></div><p id="dbStatus" class="status" role="status">尚未載入資料庫</p>
 <details><summary>展開 CSV 匯入診斷</summary><pre id="csvDiagnostics">尚未匯入 CSV</pre></details></main>
 <main><h2>② 自訂份量換算（本次新增）</h2><p class="muted">可選擇儲存在此瀏覽器；清除網站資料會遺失，請定期匯出設定備份。預設「蛋／雞蛋／一般雞蛋」1 顆＝50g 僅供測試；鴨蛋、鵪鶉蛋等需另設份量，其他份量須自行設定；不會默默猜測半碗或一片的重量。</p><div class="actions"><input id="portionFood" placeholder="食物名稱，例如白飯" aria-label="份量食物名稱" style="max-width:210px"><select id="portionUnit" aria-label="份量單位" style="max-width:130px"><option>碗</option><option>顆</option><option>個</option><option>片</option><option>塊</option><option>湯匙</option><option>茶匙</option><option>份</option><option>口</option><option>mL</option></select><input id="portionGrams" type="number" min="0.1" step="0.1" placeholder="每單位幾公克" aria-label="每單位公克" style="max-width:165px"><button id="savePortion" class="secondary">新增換算</button></div><p id="portionStatus" class="status" role="status"></p><div id="portionList" class="muted"></div></main>
@@ -18,12 +18,12 @@
 <main><h2>⑥ 食材輸入與確認</h2><p class="muted">最多 50 項；重量可填 100g、半碗、2顆等。官方品項需要逐項選擇，不會自行猜測雞胸肉品種。</p><p id="count"></p><div id="rows"></div><div class="actions"><button id="add">＋ 增加食材</button><button id="mock" class="secondary">載入虛構辨識示範</button><button id="calculate" disabled>確認全部並計算</button></div><p id="status" class="status" role="status"></p></main>
 <main><h2>⑦ B9｜原始 V1.9.0 結構對照（僅供檢查）</h2><p class="muted">本區產生可供開發者核對的 V1.9.0 形狀草稿，不會寫入原始程式的資料，也不會連接 Google Cloud。只使用虛構食材資料；正式整合前仍需驗證原始匯入與紀錄流程。</p><div class="actions"><button id="checkCompatibility" class="secondary">檢查 24 項欄位與資料結構</button><button id="exportCompatibility" class="secondary">下載 V1.9.0 結構對照 JSON</button></div><pre id="compatReport" role="status">尚未執行對照檢查</pre></main>
 <main><h2>⑧ 整餐營養結果</h2><div class="stats"><p>熱量 <b id="cal">—</b> kcal</p><p>蛋白質 <b id="pro">—</b> g</p></div><p id="coverage">尚未計算</p><details open><summary>查看食材換算重量與營養貢獻</summary><div id="weightDetails" class="muted"></div></details><details><summary>展開 24 項營養素與完整性</summary><div id="nutrients"></div></details><details><summary>查看餐點 JSON 草稿（不會上傳）</summary><pre id="output">尚未產生</pre></details></main>
-<main><h2>⑨ B9.1｜正式 CSV 匯入前完整性稽核（唯讀）</h2>
+<main><h2>⑨ B9.1.1｜正式 CSV 匯入前完整性稽核（唯讀）</h2>
 <p class="muted">依原始 V1.9.0 的長格式欄位：整合編號、樣品名稱、俗名、分析項、每100克含量、含量單位。此處只在記憶體分析，不匯入餐點資料庫、不覆蓋現有資料、不自動保存 CSV。請先確認 CSV 來源，這裡無法驗證是否為食藥署官方發布。</p>
 <label>選擇待稽核 CSV <input id="auditCsv" type="file" accept=".csv,text/csv"></label>
 <div class="actions"><button id="downloadAudit" class="secondary" disabled>下載完整性報告 JSON</button></div>
 <p id="auditStatus" role="status">尚未選擇 CSV</p>
-<details open><summary>稽核摘要</summary><pre id="auditReport">尚未稽核</pre></details>
+<details open><summary>稽核摘要</summary><pre id="csvAuditReport">尚未稽核</pre></details>
 <p class="muted">通過格式檢查 ≠ 正式資料庫整合完成。資料品質警示不代表應自動刪除或更正原始數值。</p></main>
 <script>
 'use strict';
@@ -336,9 +336,9 @@ $('auditCsv').addEventListener('change',async e=>{
  try{
   lastAuditReport=auditOfficialCsv(await file.text(),file.name);
   $('auditStatus').textContent='唯讀稽核完成：'+lastAuditReport.sourceRows+' 列，'+lastAuditReport.uniqueIds+' 個食材編號；沒有修改既有資料。';
-  $('auditReport').textContent=JSON.stringify(lastAuditReport,null,2);
+  $('csvAuditReport').textContent=JSON.stringify(lastAuditReport,null,2);
   $('downloadAudit').disabled=false;
- }catch(err){$('auditStatus').textContent='稽核失敗：'+err.message;$('auditReport').textContent='未產生報告'}
+ }catch(err){$('auditStatus').textContent='稽核失敗：'+err.message;$('csvAuditReport').textContent='未產生報告'}
  e.target.value='';
 });
 $('downloadAudit').addEventListener('click',()=>{
