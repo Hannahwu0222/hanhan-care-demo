@@ -18,13 +18,13 @@
 <main><h2>⑥ 食材輸入與確認</h2><p class="muted">最多 50 項；重量可填 100g、半碗、2顆等。官方品項需要逐項選擇，不會自行猜測雞胸肉品種。</p><p id="count"></p><div id="rows"></div><div class="actions"><button id="add">＋ 增加食材</button><button id="mock" class="secondary">載入虛構辨識示範</button><button id="calculate" disabled>確認全部並計算</button></div><p id="status" class="status" role="status"></p></main>
 <main><h2>⑦ B9｜原始 V1.9.0 結構對照（僅供檢查）</h2><p class="muted">本區產生可供開發者核對的 V1.9.0 形狀草稿，不會寫入原始程式的資料，也不會連接 Google Cloud。只使用虛構食材資料；正式整合前仍需驗證原始匯入與紀錄流程。</p><div class="actions"><button id="checkCompatibility" class="secondary">檢查 24 項欄位與資料結構</button><button id="exportCompatibility" class="secondary">下載 V1.9.0 結構對照 JSON</button></div><pre id="compatReport" role="status">尚未執行對照檢查</pre></main>
 <main><h2>⑧ 整餐營養結果</h2><div class="stats"><p>熱量 <b id="cal">—</b> kcal</p><p>蛋白質 <b id="pro">—</b> g</p></div><p id="coverage">尚未計算</p><details open><summary>查看食材換算重量與營養貢獻</summary><div id="weightDetails" class="muted"></div></details><details><summary>展開 24 項營養素與完整性</summary><div id="nutrients"></div></details><details><summary>查看餐點 JSON 草稿（不會上傳）</summary><pre id="output">尚未產生</pre></details></main>
-<main><h2>⑨ B9.1.1｜正式 CSV 匯入前完整性稽核（唯讀）</h2>
-<p class="muted">依原始 V1.9.0 的長格式欄位：整合編號、樣品名稱、俗名、分析項、每100克含量、含量單位。此處只在記憶體分析，不匯入餐點資料庫、不覆蓋現有資料、不自動保存 CSV。請先確認 CSV 來源，這裡無法驗證是否為食藥署官方發布。</p>
+<main><h2>⑨ B9.2｜正式 CSV 匯入前完整性稽核（唯讀）</h2>
+<p class="muted">新增每項營養素的食材涵蓋率、完整 24 項食材數與需人工審查的衝突。依原始 V1.9.0 的長格式欄位：整合編號、樣品名稱、俗名、分析項、每100克含量、含量單位。此處只在記憶體分析，不匯入餐點資料庫、不覆蓋現有資料、不自動保存 CSV。請先確認 CSV 來源，這裡無法驗證是否為食藥署官方發布。</p>
 <label>選擇待稽核 CSV <input id="auditCsv" type="file" accept=".csv,text/csv"></label>
 <div class="actions"><button id="downloadAudit" class="secondary" disabled>下載完整性報告 JSON</button></div>
 <p id="auditStatus" role="status">尚未選擇 CSV</p>
 <details open><summary>稽核摘要</summary><pre id="csvAuditReport">尚未稽核</pre></details>
-<p class="muted">通過格式檢查 ≠ 正式資料庫整合完成。資料品質警示不代表應自動刪除或更正原始數值。</p></main>
+<p class="muted">B9.2 的涵蓋率以「有有效數值的食材數／CSV 中食材數」計算。通過格式檢查 ≠ 正式資料庫整合完成。資料品質警示不代表應自動刪除或更正原始數值。</p></main>
 <script>
 'use strict';
 const fields=["cal", "pro", "carb", "fat", "fiber", "vitA", "b1", "b2", "b6", "folate", "vitC", "vitE", "calcium", "phosphorus", "magnesium", "potassium", "sodium", "iron", "zinc", "selenium", "copper", "manganese", "germanium", "cobalt"];
@@ -281,7 +281,7 @@ $('exportCompatibility').addEventListener('click',()=>{
 });
 
 
-// B9.1 read-only CSV audit. Does not mutate database or persisted draft.
+// B9.2 read-only CSV audit. Does not mutate database or persisted draft.
 let lastAuditReport=null;
 function auditOfficialCsv(text,fileName){
  const parsed=csvParse(text.replace(/^\uFEFF/,''));
@@ -295,11 +295,12 @@ function auditOfficialCsv(text,fileName){
  const idMap=new Map(),nameIds=new Map(),unitErrors=[],duplicates=[],invalid=[],unknownKeys=new Map();
  let missingNames=0,missingValues=0,recognizedRows=0,validRows=0;
  const counts=Object.fromEntries(fields.map(k=>[k,0]));
- const nutrientValues=new Map();
+ const nutrientValues=new Map(), foodCoverage=new Map(), foodRows=new Map();
  for(let i=0;i<data.length;i++){
   const row=data[i],line=i+2,name=String(row[idx('樣品名稱')]||'').trim();
   const id=idx('整合編號')>=0?String(row[idx('整合編號')]||'').trim():name;
   if(!name){missingNames++;continue}
+  foodRows.set(id,(foodRows.get(id)||0)+1);
   const prior=idMap.get(id);if(prior&&prior!==name&&duplicates.length<30)duplicates.push({line,id,firstName:prior,conflictName:name});
   else if(!prior)idMap.set(id,name);
   if(!nameIds.has(name))nameIds.set(name,new Set());nameIds.get(name).add(id);
@@ -312,12 +313,21 @@ function auditOfficialCsv(text,fileName){
   const val=normalizeNutrient(raw,unit,key);
   if(val===null){if(unitErrors.length<30)unitErrors.push({line,name,analysis:rawLabel,unit});continue}
   validRows++;counts[key]++;
+  if(!foodCoverage.has(id))foodCoverage.set(id,new Set());foodCoverage.get(id).add(key);
   const k=id+'\u0000'+key,old=nutrientValues.get(k);
   if(old!==undefined&&Math.abs(old-val)>1e-8&&invalid.length<30)invalid.push({line,id,name,nutrient:key,first:old,next:val});
   if(old===undefined)nutrientValues.set(k,val);
  }
  const repeatNames=[...nameIds].filter(([,ids])=>ids.size>1).slice(0,30).map(([name,ids])=>({name,ids:[...ids].slice(0,8)}));
- return {format:'hanhan-csv-audit-b9.1',fileName,sourceVerified:false,readOnly:true,
+ const foodCoverageSummary=fields.map(key=>({nutrient:key,label:nutrientInfo[key][0],foodsWithValue:[...foodCoverage.values()].filter(keys=>keys.has(key)).length,foodCount:idMap.size,percent:idMap.size?Math.round(10000*[...foodCoverage.values()].filter(keys=>keys.has(key)).length/idMap.size)/100:0}));
+ const incompleteFoods=[...idMap].map(([id,name])=>({id,name,availableNutrients:foodCoverage.get(id)?.size||0,missing:fields.filter(k=>!foodCoverage.get(id)?.has(k))})).sort((a,b)=>a.availableNutrients-b.availableNutrients).slice(0,30);
+ const hardBlockers=[...(duplicates.length?['相同整合編號對應不同食材名稱']:[]),...(invalid.length?['相同食材的營養數值存在衝突']:[]),...(unitErrors.length?['部分已辨識營養素單位無法換算']:[])];
+ return {format:'hanhan-csv-audit-b9.2',auditStatus:hardBlockers.length?'NEEDS_REVIEW':'FORMAT_REVIEWED',hardBlockers,
+  coverageDefinition:'每種營養素具有至少一筆有效數值的食材編號數；未檢出或空白不視為零',
+  foodNutrientCoverage:foodCoverageSummary,foodsWith24Nutrients:[...foodCoverage.values()].filter(keys=>keys.size===24).length,
+  foodsWithCaloriesAndProtein:[...foodCoverage.values()].filter(keys=>keys.has('cal')&&keys.has('pro')).length,
+  leastCompleteFoodsSample:incompleteFoods
+  ,fileName,sourceVerified:false,readOnly:true,
   header:head,sourceRows:data.length,uniqueIds:idMap.size,uniqueNames:nameIds.size,
   recognizedRows,validRows,missingNames,missingValues,
   unsupportedAnalysisLabels:[...unknownKeys].sort((a,b)=>b[1]-a[1]).slice(0,30).map(([name,count])=>({name,count})),
@@ -344,7 +354,7 @@ $('auditCsv').addEventListener('change',async e=>{
 $('downloadAudit').addEventListener('click',()=>{
  if(!lastAuditReport)return;
  const blob=new Blob([JSON.stringify(lastAuditReport,null,2)],{type:'application/json'});
- const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='HanHan-B9.1-CSV-audit.json';
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='HanHan-B9.2-CSV-audit.json';
  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
 });
 
