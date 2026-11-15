@@ -1,6 +1,6 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B9.8</title>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B9.9</title>
 <style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#373344;background:#f5f2f6}body{max-width:1000px;margin:20px auto;padding:0 14px}header,main{background:#fff;border-radius:17px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px #2520300a}h1{font-size:24px;margin:0 0 10px}h2{font-size:18px}.notice{background:#f2eaf4;padding:13px;border-radius:10px;line-height:1.65}button{border:0;border-radius:9px;background:#77648e;color:white;padding:10px 13px;cursor:pointer}button:disabled{opacity:.4}.secondary{background:#ece5f1;color:#59446b}.danger{background:#f9e8e8;color:#934c4c}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.foodrow{display:grid;grid-template-columns:1.1fr .7fr 1.4fr auto auto;gap:8px;padding:13px 0;border-bottom:1px solid #eee}input,select{box-sizing:border-box;width:100%;padding:9px;border:1px solid #d6ccd9;border-radius:8px;min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f6f8;padding:12px;max-height:320px;overflow:auto}.muted{color:#6d6774;font-size:14px}.status{min-height:1.5em;color:#765b8b}.stats{display:flex;gap:28px;flex-wrap:wrap}label{display:block;margin:7px 0}small{color:#706b86}@media(max-width:700px){.foodrow{grid-template-columns:1fr 1fr}.foodrow select{grid-column:1/-1}header,main{padding:15px}}.conversion-row{grid-column:1/-1;padding:0 4px 9px}.conversion-note{margin:0;font-size:13px;line-height:1.6}#weightDetails p{margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px}</style></head><body>
-<header><h1>HanHan Care｜營養資料庫整合草稿 B9.8</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；僅在明確勾選後，將虛構測試資料儲存在本裝置瀏覽器，不會上傳伺服器。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版參考 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
+<header><h1>HanHan Care｜營養資料庫整合草稿 B9.9</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；僅在明確勾選後，將虛構測試資料儲存在本裝置瀏覽器，不會上傳伺服器。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版參考 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
 <main><h2>① 選擇食物資料來源</h2><p class="muted">可先載入 10 項<b>虛構測試資料</b>測試流程；或選擇符合 V1.9.0 格式的食物 CSV。CSV 的來源由使用者自行確認；程式不會驗證資料是否由食藥署發布。不要上傳包含個人紀錄的 JSON 備份。</p><div class="actions"><button id="fixture" class="secondary">載入虛構食物資料</button><input id="csv" type="file" accept=".csv,text/csv" aria-label="選擇官方食物 CSV"></div><p id="dbStatus" class="status" role="status">尚未載入資料庫</p>
 <details><summary>展開 CSV 匯入診斷</summary><pre id="csvDiagnostics">尚未匯入 CSV</pre></details></main>
 <main><h2>② 自訂份量換算（本次新增）</h2><p class="muted">可選擇儲存在此瀏覽器；清除網站資料會遺失，請定期匯出設定備份。預設「蛋／雞蛋／一般雞蛋」1 顆＝50g 僅供測試；鴨蛋、鵪鶉蛋等需另設份量，其他份量須自行設定；不會默默猜測半碗或一片的重量。</p><div class="actions"><input id="portionFood" placeholder="食物名稱，例如白飯" aria-label="份量食物名稱" style="max-width:210px"><select id="portionUnit" aria-label="份量單位" style="max-width:130px"><option>碗</option><option>顆</option><option>個</option><option>片</option><option>塊</option><option>湯匙</option><option>茶匙</option><option>份</option><option>口</option><option>mL</option></select><input id="portionGrams" type="number" min="0.1" step="0.1" placeholder="每單位幾公克" aria-label="每單位公克" style="max-width:165px"><button id="savePortion" class="secondary">新增換算</button></div><p id="portionStatus" class="status" role="status"></p><div id="portionList" class="muted"></div></main>
@@ -58,6 +58,15 @@
 <p id="b98Status" class="status" role="status">尚未執行。可先於①載入 2,213 種食材 CSV，再進行完整回歸檢查。</p>
 <pre id="b98Result">尚無檢查結果</pre>
 <p class="muted">本區對照原始 V1.9.0 的資料欄位（meals、health、visits、supplements、officialFoods、officialMeta、settings、portions、foodMappings、foodMappingsConfirmed），並檢查 JSON 往返、回復快照、缺值與重量換算。無法自動證明原版 UI 與新版之間的實際升級／還原成功。</p>
+</main>
+
+<main id="b99Panel"><h2>⑮ B9.9｜舊版備份唯讀預覽與差異比對</h2>
+<p class="notice"><b>只接受虛構測試備份。</b> 本區讀取你在本機選擇的 JSON，僅在瀏覽器記憶體中比對，不會還原、不會覆寫 localStorage/IndexedDB/Firestore，也不會上傳伺服器。公開 GitHub Pages 請勿選擇真實健康備份。</p>
+<div class="actions"><button id="b99Fixture" class="secondary">① 下載虛構舊版備份</button><label>② 選擇虛構 JSON：<input id="b99File" type="file" accept=".json,application/json"></label></div>
+<label><input type="checkbox" id="b99Consent" style="width:auto"> 我確認選擇的是虛構測試資料，沒有真實健康資訊</label>
+<div class="actions"><button id="b99Run">③ 執行唯讀預覽與差異比對</button><button id="b99Export" class="secondary" disabled>④ 下載 B9.9 診斷 JSON</button></div>
+<p id="b99Status" class="status" role="status">尚未執行。請先下載範例，再選取虛構 JSON。</p><pre id="b99Result">尚無結果</pre>
+<p class="muted">只輸出欄位、型別、筆數與相容性結果；不會把餐點名稱、健康內容或個人資料寫入診斷報告。這不是正式升級／還原測試。</p>
 </main>
 <script>
 'use strict';
@@ -572,4 +581,49 @@ function b98Run(){
 $('b98Run').addEventListener('click',()=>{try{b98Report=b98Run();$('b98Result').textContent=JSON.stringify(b98Report,null,2);$('b98Status').textContent='B9.8 結果：'+b98Report.status+'（唯讀虛構資料）';$('b98Export').disabled=false}catch(e){$('b98Status').textContent='檢查失敗：'+e.message}});
 $('b98Export').addEventListener('click',()=>{if(b98Report)downloadJson(b98Report,'HanHan_B9_8_safety_check.json')});
 $('b98Fixture').addEventListener('click',()=>downloadJson(b98Fixture(),'HanHan_B9_8_fictional_legacy_backup.json'));
+
+// B9.9: read-only fictional backup preview; no persistence or network.
+let b99Report=null;
+const b99ArrayKeys=['meals','health','visits','supplements','officialFoods'];
+const b99ObjectKeys=['settings','portions','foodMappings','foodMappingsConfirmed'];
+const b99IsObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+function b99Analyze(parsed){
+ const expected=b98Fixture();
+ const keys=b98LegacyKeys;
+ const checks=[];
+ for(const key of keys){
+   const present=Object.prototype.hasOwnProperty.call(parsed,key);
+   const kind=b99ArrayKeys.includes(key)?'array':key==='officialMeta'?'object-or-null':'object';
+   const valid=present&&(kind==='array'?Array.isArray(parsed[key]):kind==='object'?b99IsObj(parsed[key]):(parsed[key]===null||b99IsObj(parsed[key])));
+   checks.push({key,expectedType:kind,present,typeValid:valid,status:!present?'MISSING':valid?'PASS':'TYPE_MISMATCH',count:valid&&kind==='array'?parsed[key].length:null,fixtureCount:kind==='array'?expected[key].length:null});
+ }
+ const formatOk=parsed.backupFormat==='HanHanCare';
+ const versionOk=typeof parsed.backupVersion==='string'&&parsed.backupVersion.length>0;
+ const unexpectedKeys=Object.keys(parsed).filter(k=>!keys.includes(k)&&!['backupFormat','backupVersion','exportedAt'].includes(k));
+ const missingKeys=checks.filter(c=>!c.present).map(c=>c.key);
+ const typeErrors=checks.filter(c=>c.present&&!c.typeValid).map(c=>c.key);
+ const status=missingKeys.length||typeErrors.length||!formatOk||!versionOk?'NEEDS_REVIEW':'PASS';
+ return {format:'hanhan-b9.9-legacy-preview',version:'B9.9',status,readOnly:true,fixtureOnly:true,source:'user-selected fictional JSON (browser memory only)',formatValid:formatOk,backupVersionPresent:versionOk,checkedKeys:checks,missingKeys,typeErrors,unexpectedKeys,countsOnly:true,contentIncluded:false,realRestoreTested:false,realUpgradeTested:false,localStorageWritten:false,indexedDbWritten:false,cloudWritten:false,notes:['僅驗證舊版備份欄位/型別/筆數；不是資料遷移或還原驗收','此診斷 JSON 不包含餐點/健康紀錄內容','僅限虛構測試資料，公開頁面請勿選擇真實備份']};
+}
+$('b99Fixture').addEventListener('click',()=>downloadJson(b98Fixture(),'HanHan_B9_9_fictional_backup.json'));
+$('b99Run').addEventListener('click',async()=>{
+ b99Report=null;$('b99Export').disabled=true;
+ if(!$('b99Consent').checked){$('b99Status').textContent='請先確認僅使用虛構測試資料';return;}
+ const file=$('b99File').files?.[0];
+ if(!file){$('b99Status').textContent='請先選擇虛構 JSON';return;}
+ if(file.size>5*1024*1024){$('b99Status').textContent='檔案超過 5MB；此測試只接受小型虛構備份';return;}
+ try{
+  const parsed=JSON.parse(await file.text());
+  if(!b99IsObj(parsed))throw Error('JSON 最外層必須為物件');
+  // Require fixture signature to reduce risk of accidentally processing real patient backups.
+  if(!Array.isArray(parsed.meals)||!parsed.meals.some(m=>b99IsObj(m)&&String(m.id||'').startsWith('DEMO-'))){
+   throw Error('未找到 DEMO- 虛構測試標記；為保護資料，本公開測試頁拒絕預覽');
+  }
+  b99Report=b99Analyze(parsed);
+  $('b99Result').textContent=JSON.stringify(b99Report,null,2);
+  $('b99Status').textContent='B9.9：'+b99Report.status+'（唯讀；未執行還原）';
+  $('b99Export').disabled=false;
+ }catch(e){$('b99Status').textContent='預覽未完成：'+e.message;$('b99Result').textContent='尚無結果';}
+});
+$('b99Export').addEventListener('click',()=>{if(b99Report)downloadJson(b99Report,'HanHan_B9_9_preview_check.json')});
 </script></body></html>
