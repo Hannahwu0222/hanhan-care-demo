@@ -1,6 +1,6 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B9.6.1</title>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HanHan Care｜營養資料庫整合草稿 B9.7</title>
 <style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#373344;background:#f5f2f6}body{max-width:1000px;margin:20px auto;padding:0 14px}header,main{background:#fff;border-radius:17px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px #2520300a}h1{font-size:24px;margin:0 0 10px}h2{font-size:18px}.notice{background:#f2eaf4;padding:13px;border-radius:10px;line-height:1.65}button{border:0;border-radius:9px;background:#77648e;color:white;padding:10px 13px;cursor:pointer}button:disabled{opacity:.4}.secondary{background:#ece5f1;color:#59446b}.danger{background:#f9e8e8;color:#934c4c}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.foodrow{display:grid;grid-template-columns:1.1fr .7fr 1.4fr auto auto;gap:8px;padding:13px 0;border-bottom:1px solid #eee}input,select{box-sizing:border-box;width:100%;padding:9px;border:1px solid #d6ccd9;border-radius:8px;min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f6f8;padding:12px;max-height:320px;overflow:auto}.muted{color:#6d6774;font-size:14px}.status{min-height:1.5em;color:#765b8b}.stats{display:flex;gap:28px;flex-wrap:wrap}label{display:block;margin:7px 0}small{color:#706b86}@media(max-width:700px){.foodrow{grid-template-columns:1fr 1fr}.foodrow select{grid-column:1/-1}header,main{padding:15px}}.conversion-row{grid-column:1/-1;padding:0 4px 9px}.conversion-note{margin:0;font-size:13px;line-height:1.6}#weightDetails p{margin:8px 0;border-bottom:1px solid #eee;padding-bottom:8px}</style></head><body>
-<header><h1>HanHan Care｜營養資料庫整合草稿 B9.6.1</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；僅在明確勾選後，將虛構測試資料儲存在本裝置瀏覽器，不會上傳伺服器。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版參考 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
+<header><h1>HanHan Care｜營養資料庫整合草稿 B9.7</h1><p class="notice"><b>獨立公開測試頁面。</b> 沒有 Gemini、沒有登入、沒有 Firestore；僅在明確勾選後，將虛構測試資料儲存在本裝置瀏覽器，不會上傳伺服器。GitHub Pages 仍會有一般網站存取紀錄。請勿匯入含真實健康紀錄的備份。僅支援「食物營養 CSV」；可選擇將自訂份量與食材對應保存在此瀏覽器。不要輸入真實健康資料。</p><p class="muted">此版參考 V1.9.0 的 CSV 解析與營養素欄位辨識，並加入份量換算草稿；餐點 UI 為新的草稿，尚非完整 V1.9.0。</p></header>
 <main><h2>① 選擇食物資料來源</h2><p class="muted">可先載入 10 項<b>虛構測試資料</b>測試流程；或選擇符合 V1.9.0 格式的食物 CSV。CSV 的來源由使用者自行確認；程式不會驗證資料是否由食藥署發布。不要上傳包含個人紀錄的 JSON 備份。</p><div class="actions"><button id="fixture" class="secondary">載入虛構食物資料</button><input id="csv" type="file" accept=".csv,text/csv" aria-label="選擇官方食物 CSV"></div><p id="dbStatus" class="status" role="status">尚未載入資料庫</p>
 <details><summary>展開 CSV 匯入診斷</summary><pre id="csvDiagnostics">尚未匯入 CSV</pre></details></main>
 <main><h2>② 自訂份量換算（本次新增）</h2><p class="muted">可選擇儲存在此瀏覽器；清除網站資料會遺失，請定期匯出設定備份。預設「蛋／雞蛋／一般雞蛋」1 顆＝50g 僅供測試；鴨蛋、鵪鶉蛋等需另設份量，其他份量須自行設定；不會默默猜測半碗或一片的重量。</p><div class="actions"><input id="portionFood" placeholder="食物名稱，例如白飯" aria-label="份量食物名稱" style="max-width:210px"><select id="portionUnit" aria-label="份量單位" style="max-width:130px"><option>碗</option><option>顆</option><option>個</option><option>片</option><option>塊</option><option>湯匙</option><option>茶匙</option><option>份</option><option>口</option><option>mL</option></select><input id="portionGrams" type="number" min="0.1" step="0.1" placeholder="每單位幾公克" aria-label="每單位公克" style="max-width:165px"><button id="savePortion" class="secondary">新增換算</button></div><p id="portionStatus" class="status" role="status"></p><div id="portionList" class="muted"></div></main>
@@ -37,10 +37,19 @@
 <p id="b95Status" class="status" role="status">尚未執行；請先載入 CSV。</p>
 <details open><summary>查看 B9.5 檢查結果</summary><pre id="b95Result">尚未檢查</pre></details>
 <p class="muted">驗證項目：白飯 100g/150g 比例、雞蛋平均值 50g/25g 比例、缺值維持 null、計算不修改原始每100g數值、資料庫是否有常見食材。未找到品項會標示 SKIP，不會假裝通過。</p></main>
-<main><h2>⑫ B9.6.1｜智慧搜尋與別名驗證（唯讀）</h2>
+<main><h2>⑫ B9.7｜智慧搜尋與別名驗證（唯讀）</h2>
 <p class="muted">完全同名優先；明確別名、相似名稱、相關候選分開標示。相關候選可能是不同物種或部位，不代表可以互換。搜尋不會自動選取或改寫營養值。</p>
-<div class="actions"><input id="b96Query" placeholder="輸入雞胸肉、高麗菜、比目魚等" style="max-width:320px" aria-label="B9.6.1 搜尋字"><button id="b96Find" class="secondary">搜尋候選</button><button id="b96Run" class="secondary">執行五組測試</button><button id="b96Export" class="secondary" disabled>下載 B9.6.1 診斷 JSON</button></div>
+<div class="actions"><input id="b96Query" placeholder="輸入雞胸肉、高麗菜、比目魚等" style="max-width:320px" aria-label="B9.7 搜尋字"><button id="b96Find" class="secondary">搜尋候選</button><button id="b96Run" class="secondary">執行五組測試</button><button id="b96Export" class="secondary" disabled>下載 B9.7 診斷 JSON</button></div>
 <p class="notice"><b>注意：⑫ 只檢查搜尋，不會直接計算營養。</b> 要計算請按下方按鈕，前往⑥輸入食材、選擇候選、按「確認此項」及「確認全部並計算」，最後在⑧查看結果。</p><div class="actions"><button id="b96ToMeal">前往⑥ 食材輸入與計算</button><button id="b96ToResult" class="secondary">前往⑧ 查看營養結果</button></div><p id="b96Status" class="status" role="status">請先於①載入食材 CSV。</p><pre id="b96Result">尚未搜尋</pre>
+</main>
+
+<main id="b97Panel"><h2>⑬ B9.7｜搜尋、餐點與備份整合測試</h2>
+<p class="muted">先於①匯入 2,213 種食材 CSV。此區可搜尋後「加入⑥」，但不會自動確認品項或計算；請在⑥逐項確認。測試僅使用本機資料，不寫入正式 V1.9.0 或雲端。</p>
+<div class="actions"><input id="b97Query" placeholder="搜尋食材，例如雞胸肉" style="max-width:280px"><button id="b97Find" class="secondary">搜尋可加入的食材</button><button id="b97GoMeal">前往⑥ 確認並計算</button></div>
+<p id="b97SearchStatus" class="status" role="status">尚未搜尋</p><div id="b97Candidates"></div>
+<div class="actions"><button id="b97Run" class="secondary">執行 B9.7 安全整合檢查</button><button id="b97Export" class="secondary" disabled>下載 B9.7 診斷 JSON</button><button id="b97Backup" class="secondary">下載目前完整測試備份</button></div>
+<p id="b97Status" class="status" role="status">尚未執行檢查</p><pre id="b97Result">尚無結果</pre>
+<p class="notice">注意：新增、刪除、修改食材會讓舊的營養結果失效。缺值一律保留未知。備份下載不等於已完成還原測試；請勿使用真實健康紀錄。</p>
 </main>
 <script>
 'use strict';
@@ -91,7 +100,7 @@ else if(Math.abs(g.values[key]-val)>1e-9)duplicateConflicts++;
 let result=[...groups.values()].filter(x=>Object.values(x.values).some(v=>v!==null));if(result.length<1)throw Error('沒有可辨識的有效食物');if(!matched.cal||!matched.pro)throw Error('缺少有效熱量或蛋白質欄位，請檢查 CSV 單位與格式');window.lastImportCounts=matched;window.lastImportDiagnostics={foods:result.length,sourceRows:rows.length-1,recognized:matched,duplicateConflicts,invalidCells,unmappedRows,missingUnits};return result}
 
 function normFood(s){return String(s||'').replace(/[\s（）()\-]/g,'').toLowerCase()}
-// B9.6.1: only explicitly curated equivalents count as aliases; broad taxonomic names remain suggestions.
+// B9.7: only explicitly curated equivalents count as aliases; broad taxonomic names remain suggestions.
 const aliasGroups=[['雞蛋','蛋','一般雞蛋'],['高麗菜','甘藍','結球甘藍'],['地瓜','甘藷','番薯'],['番茄','蕃茄']];
 const relatedTerms={'雞胸肉':['雞胸','雞里肌'],'高麗菜':['甘藍','結球甘藍'],'比目魚':['鰈','鰨'],'白飯':['白飯'],'雞蛋':['雞蛋']};
 function normFood(s){return String(s||'').replace(/[\s（）()\-]/g,'').toLowerCase()}
@@ -465,7 +474,7 @@ $('b95Export').addEventListener('click',()=>{
 });
 
 
-// B9.6.1 diagnostic: read-only and explicit about non-equivalence.
+// B9.7 diagnostic: read-only and explicit about non-equivalence.
 let b96Report=null;
 function b96Diagnostics(queries){const cases=queries.map(query=>({query,results:b96Search(query,24).map(x=>({name:x.name,category:x.tier,reason:x.reason})),automaticSelection:false}));return {format:'hanhan-b9.6-search-diagnostic',foodCount:database.length,sourceVerified:false,readOnly:true,caseCount:cases.length,cases,notes:['相關候選不是等價食材','未找到結果不自動替換','未修改營養數值、餐點或雲端資料']}}
 function b96Show(queries){if(!database.length){$('b96Status').textContent='請先於①載入食材 CSV';return}b96Report=b96Diagnostics(queries);$('b96Result').textContent=JSON.stringify(b96Report,null,2);$('b96Status').textContent='搜尋完成（僅搜尋，未計算營養）：'+queries.map((q,i)=>q+' '+b96Report.cases[i].results.length+' 筆').join('、');$('b96Export').disabled=false}
@@ -474,4 +483,51 @@ $('b96ToResult').addEventListener('click',()=>{$('mealResult').scrollIntoView({b
 $('b96Find').addEventListener('click',()=>{const q=$('b96Query').value.trim();if(!q){$('b96Status').textContent='請輸入食材名稱';return}b96Show([q])});
 $('b96Run').addEventListener('click',()=>b96Show(['雞胸肉','高麗菜','比目魚','雞蛋','白飯']));
 $('b96Export').addEventListener('click',()=>{if(!b96Report)return;const blob=new Blob([JSON.stringify(b96Report,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='HanHan_B9_6_search_diagnostic.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2500)});
+
+// B9.7 independent integration tests. No mutation of live meal rows in diagnostic.
+let b97Report=null;
+function b97PureMeal(items){
+ const sums=Object.fromEntries(fields.map(k=>[k,0]));
+ const coverage=Object.fromEntries(fields.map(k=>[k,0]));
+ for(const it of items){
+  if(!it||!it.food||!it.food.values||!Number.isFinite(it.grams)||it.grams<=0)throw Error('測試食材或重量無效');
+  for(const k of fields){const v=it.food.values[k];if(v===null||v===undefined)continue;
+   if(typeof v!=='number'||!Number.isFinite(v)||v<0)throw Error('測試營養數值無效：'+k);
+   sums[k]+=v*it.grams/100;coverage[k]++;
+  }
+ }
+ return {nutrition:Object.fromEntries(fields.map(k=>[k,items.length&&coverage[k]===items.length?sums[k]:null])),coverage};
+}
+function b97Close(a,b){return typeof a==='number'&&typeof b==='number'&&Math.abs(a-b)<1e-7*Math.max(1,Math.abs(a),Math.abs(b))}
+function b97Case(name,ok,details){return {name,status:ok?'PASS':'FAIL',details}}
+function b97Checks(){
+ const cases=[];
+ if(!database.length){return {format:'hanhan-b9.7-integration',status:'NEEDS_DATA',cases:[],foodCount:0,readOnly:true,warning:'請先載入食材 CSV'}}
+ const rice=database.find(f=>f.name==='白飯');const egg=database.find(f=>f.name==='雞蛋平均值');
+ if(!rice||!egg){return {format:'hanhan-b9.7-integration',status:'NEEDS_REVIEW',cases:[],foodCount:database.length,readOnly:true,warning:'未找到白飯或雞蛋平均值，無法完成固定測試'}}
+ const before=JSON.stringify({rice:rice.values,egg:egg.values});
+ const a=b97PureMeal([{food:rice,grams:100}]),b=b97PureMeal([{food:rice,grams:150}]);
+ cases.push(b97Case('修改重量後重新計算',fields.every(k=>a.nutrition[k]===null?b.nutrition[k]===null:b97Close(b.nutrition[k],a.nutrition[k]*1.5)),{rice100:a.nutrition.cal,rice150:b.nutrition.cal}));
+ const together=b97PureMeal([{food:rice,grams:100},{food:egg,grams:50}]);
+ const removed=b97PureMeal([{food:rice,grams:100}]);
+ cases.push(b97Case('新增與移除食材重算',fields.every(k=>{const x=rice.values[k],y=egg.values[k];return x==null||y==null?together.nutrition[k]===null:b97Close(together.nutrition[k],x+y*.5)})&&fields.every(k=>removed.nutrition[k]===a.nutrition[k]),{twoFoodsCalories:together.nutrition.cal,afterRemoveCalories:removed.nutrition.cal}));
+ cases.push(b97Case('缺值不可補零',fields.every(k=>{const x=rice.values[k],y=egg.values[k];return x==null||y==null?together.nutrition[k]===null:together.nutrition[k]!==null}),{missingFields:fields.filter(k=>together.nutrition[k]===null)}));
+ cases.push(b97Case('原始每100克數值不變',before===JSON.stringify({rice:rice.values,egg:egg.values}),{}));
+ let snapshotOk=false,backupInfo='';try{const s=draftSnapshot();validateDraft(s);const parsed=JSON.parse(JSON.stringify(s));validateDraft(parsed);snapshotOk=parsed.database.length===database.length&&parsed.rows.length===rows.length;backupInfo='僅驗證目前備份結構與 JSON 往返，未寫入或覆蓋本機資料';}catch(e){backupInfo=e.message}
+ cases.push(b97Case('備份結構與 JSON 往返',snapshotOk,{note:backupInfo}));
+ const status=cases.some(c=>c.status==='FAIL')?'FAIL':'PASS';
+ return {format:'hanhan-b9.7-integration',version:'B9.7',status,foodCount:database.length,sourceVerified:false,readOnly:true,caseCount:cases.length,cases,liveMealRows:rows.length,liveMealUnchanged:true,backupRestoreTested:false,missingValuesPolicy:'null is unknown, not zero',notes:['自動檢查使用白飯與雞蛋平均值，不代表所有食材皆已驗證','備份結構驗證不等於實際重新整理後還原驗收','未寫入原始 V1.9.0、Firestore 或雲端']};
+}
+$('b97Find').addEventListener('click',()=>{
+ const q=$('b97Query').value.trim();const root=$('b97Candidates');root.replaceChildren();
+ if(!database.length){$('b97SearchStatus').textContent='請先於①載入 CSV';return}
+ if(!q){$('b97SearchStatus').textContent='請先輸入搜尋名稱';return}
+ const hits=b96Search(q,15);$('b97SearchStatus').textContent='找到 '+hits.length+' 筆候選；點選加入後仍需於⑥人工確認';
+ if(!hits.length){root.textContent='找不到適合的候選，不會自動替換';return}
+ for(const hit of hits){const p=document.createElement('p');p.className='conversion-note';const label=document.createElement('span');label.textContent='【'+({exact:'完全同名',alias:'明確別名',similar:'相似候選',related:'相關候選'}[hit.tier]||'候選')+'】'+hit.name+'　';const btn=document.createElement('button');btn.className='secondary';btn.textContent='加入⑥（待確認）';btn.addEventListener('click',()=>{if(rows.length>=50){$('b97SearchStatus').textContent='最多50項食材';return}addRow(q,'100g');const r=rows[rows.length-1];r.foodIndex=hit.index;r.confirmed=false;render();$('b97SearchStatus').textContent='已加入 '+hit.name+'；請到⑥確認食材與重量後計算';$('mealEntry').scrollIntoView({behavior:'smooth',block:'start'});});p.append(label,btn);root.append(p)}
+});
+$('b97GoMeal').addEventListener('click',()=>{$('mealEntry').scrollIntoView({behavior:'smooth',block:'start'})});
+$('b97Run').addEventListener('click',()=>{try{b97Report=b97Checks();$('b97Result').textContent=JSON.stringify(b97Report,null,2);$('b97Status').textContent='檢查結果：'+b97Report.status+'；不影響目前餐點';$('b97Export').disabled=false}catch(e){$('b97Status').textContent='檢查失敗：'+e.message}});
+$('b97Export').addEventListener('click',()=>{if(b97Report)downloadJson(b97Report,'HanHan_B9_7_integration_check.json')});
+$('b97Backup').addEventListener('click',()=>{try{const s=draftSnapshot();validateDraft(s);downloadJson(s,'HanHan_B9_7_demo_backup.json');$('b97Status').textContent='已觸發完整測試備份下載，請確認下載資料夾'}catch(e){$('b97Status').textContent='備份檢查失敗：'+e.message}});
 </script></body></html>
